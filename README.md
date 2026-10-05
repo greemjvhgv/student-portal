@@ -12,10 +12,28 @@ A Flutter app for students affected by load shedding and unstable connectivity. 
 | Leo | Backend: submissions, grades and grade-query endpoints | `leo/` |
 | Ofentse | Backend: sync service and conflict resolution | `ofentse/` |
 
+**→ See `docs/folder-ownership.md` for exactly which files are yours.**
+
 ## Folders
-- `lib/` – Flutter app
-- `backend/` – FastAPI backend
-- `docs/API_CONTRACT.md` – the agreed API between the app and the backend
+```
+student_portal/
+├── lib/
+│   ├── main.dart          app entry point + routes (Annuschka)
+│   ├── models/            Dart data classes mirroring the API contract
+│   ├── screens/            one file per wireframe screen
+│   ├── services/          local_db_service.dart (sqflite) + sync_service.dart (http)
+│   └── widgets/           shared UI (offline_badge.dart, etc.)
+├── backend/
+│   └── app/
+│       ├── main.py        FastAPI entry point (Ruan)
+│       ├── database.py    server-side DB setup (Ruan)
+│       ├── models/        SQLAlchemy models matching the D3 ERD (Adnan)
+│       ├── routers/       one file per resource — see docs/folder-ownership.md
+│       └── services/      sync_service.py — the Sync Service Broker (Ofentse)
+└── docs/
+    ├── API_CONTRACT.md       the agreed API between the app and the backend
+    └── folder-ownership.md   who works in which file
+```
 
 ## You need
 - Flutter 3.47.x with Dart 3.13.4 or newer (`flutter --version`; run `flutter upgrade` if older)
@@ -27,7 +45,17 @@ A Flutter app for students affected by load shedding and unstable connectivity. 
 2. Plug in your phone, then `flutter run`
 
 ## Run the backend
-Ruan will add the commands here.
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+Runs at `http://127.0.0.1:8000` (interactive docs at `/docs`). Routers are
+currently stubs (raise `NotImplementedError`) until each owner fills theirs
+in per `docs/folder-ownership.md` — the app will still start and list all
+routes, so you can build against it incrementally.
 
 ## Connect your phone to the backend
 With the phone plugged in and the backend running, run `adb reverse tcp:8000 tcp:8000`. Repeat it every time you re-plug the phone. The app then reaches the backend at `http://127.0.0.1:8000`.
@@ -39,3 +67,4 @@ With the phone plugged in and the backend running, run `adb reverse tcp:8000 tcp
 4. Open a Pull Request into `main`; another member reviews and runs it before merging
 5. To bring the latest main into your branch: `git checkout main`, `git pull`, `git checkout yourname/short-description`, `git merge main`
 6. Never commit `.venv/`, database files, passwords or secret keys
+7. Changing the API contract? Edit `docs/API_CONTRACT.md` first and flag it in the group chat — both frontend and backend build against that file
