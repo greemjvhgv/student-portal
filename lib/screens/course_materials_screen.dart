@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/portal_app_bar.dart';
+import '../widgets/dashed_border_painter.dart';
 
 typedef _Material = ({String module, String title, bool cached});
 
@@ -74,7 +75,7 @@ class CourseMaterialsScreen extends StatelessWidget {
                 child: content,
               )
             : CustomPaint(
-                foregroundPainter: const _DashedBorderPainter(color: _missingRed),
+                foregroundPainter: const DashedBorderPainter(color: _missingRed),
                 child: Container(
                   decoration: BoxDecoration(
                     color: _missingFill,
@@ -149,33 +150,4 @@ class CourseMaterialsScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DashedBorderPainter extends CustomPainter {
-  const _DashedBorderPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    final border = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(8)),
-      );
-    for (final metric in border.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        canvas.drawPath(metric.extractPath(distance, distance + 8), paint);
-        distance += 14; // 8 px dash + 6 px gap
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
-      oldDelegate.color != color;
 }
