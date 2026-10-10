@@ -46,8 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
     setState(() {
-      _isLoading = false;
-      _errorText = 'TODO: wire this up to the backend (see file header).';
+      Navigator.pushReplacementNamed(context, '/dashboard');
     });
   }
 
