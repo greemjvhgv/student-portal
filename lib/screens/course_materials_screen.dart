@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
-
-import '../widgets/offline_badge.dart';
+import '../widgets/portal_app_bar.dart';
 
 typedef _Material = ({String module, String title, bool cached});
 
-/// Course Materials (D3 Figure 4): files grouped by module, each marked
-/// "Cached" when it is stored on the phone, plus a low-storage hint.
-/// Uses placeholder data until LocalDbService is built.
+/// Course Materials (D3 Figure 4): files grouped by module. Cached files
+/// have a blue box and "Cached ✓"; files not yet downloaded have a red
+/// dashed box. Uses placeholder data until LocalDbService is built.
 class CourseMaterialsScreen extends StatelessWidget {
   const CourseMaterialsScreen({super.key});
 
-  // Placeholder data from the wireframe.
+  static const _navy = PortalAppBar.navy;
+  static const _cachedFill = Color(0xFFF4F9FC);
+  static const _cachedBorder = Color(0xFF81D4FA);
+  static const _cachedBlue = Color(0xFF29B6F6);
+  static const _missingFill = Color(0xFFFFF1F1);
+  static const _missingRed = Color(0xFFD32F2F);
+  static const _missingText = Color(0xFFB71C1C);
+  static const _warningFill = Color(0xFFFFFDE7);
+  static const _warningBorder = Color(0xFFFFD54F);
+  static const _warningText = Color(0xFF8D4A00);
+
   static const List<_Material> _materials = [
     (module: 'ITMDA3-34', title: 'Week 6 - Lecture Slides.pdf', cached: true),
     (module: 'ITMDA3-34', title: 'Study Guide - Databases.pdf', cached: false),
@@ -26,62 +35,147 @@ class CourseMaterialsScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Widget _materialTile(BuildContext context, _Material material) {
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              material.title,
+              style: TextStyle(
+                fontSize: 16,
+                letterSpacing: 0.6,
+                color: material.cached ? _navy : _missingText,
+              ),
+            ),
+          ),
+          if (material.cached)
+            const Text(
+              'Cached ✓',
+              style: TextStyle(fontSize: 16, color: _cachedBlue),
+            ),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => _openMaterial(context, material),
+        child: material.cached
+            ? Container(
+                decoration: BoxDecoration(
+                  color: _cachedFill,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _cachedBorder, width: 2),
+                ),
+                child: content,
+              )
+            : CustomPaint(
+                foregroundPainter: const _DashedBorderPainter(color: _missingRed),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _missingFill,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: content,
+                ),
+              ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final modules = {for (final material in _materials) material.module}.toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Course Materials'),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: OfflineBadge(isOnline: true),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          for (final module in modules) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 4),
-              child: Text(
-                module,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-            for (final material in _materials.where((m) => m.module == module))
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.picture_as_pdf_outlined),
-                  title: Text(material.title),
-                  trailing: material.cached
-                      ? const Chip(label: Text('Cached'))
-                      : const Icon(Icons.cloud_download_outlined),
-                  onTap: () => _openMaterial(context, material),
+      backgroundColor: Colors.white,
+      appBar: const PortalAppBar(title: 'Course Materials'),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            for (final module in modules) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 6),
+                child: Text(
+                  module,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _navy,
+                  ),
                 ),
               ),
-          ],
-          const SizedBox(height: 16),
-          Card(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: const ListTile(
-              leading: Icon(Icons.storage_outlined),
-              title: Text('Low storage'),
-              subtitle: Text('Try removing older items?'),
+              for (final material in _materials.where((m) => m.module == module))
+                _materialTile(context, material),
+            ],
+            const SizedBox(height: 16),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _warningFill,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _warningBorder, width: 3),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 18, color: _warningText),
+                  SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'Low storage try removing older items?',
+                      style: TextStyle(color: _warningText, letterSpacing: 0.4),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Cached items open with zero network latency',
-            textAlign: TextAlign.center,
-          ),
-        ],
+            const SizedBox(height: 24),
+            const Divider(indent: 24, endIndent: 24),
+            const SizedBox(height: 4),
+            const Text(
+              'Cached items open with zero network latency',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    final border = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(8)),
+      );
+    for (final metric in border.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 8), paint);
+        distance += 14; // 8 px dash + 6 px gap
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

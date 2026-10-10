@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widgets/portal_app_bar.dart';
 
-import '../widgets/offline_badge.dart';
+typedef _GradeRow = ({String code, String name, double? mark});
 
 /// My Grades (D3 Figure 5): one card per module with its mark or
 /// "Pending", a "Flag a grade query" button and a "Last synced" footer.
@@ -8,14 +9,19 @@ import '../widgets/offline_badge.dart';
 class GradesScreen extends StatelessWidget {
   const GradesScreen({super.key});
 
-  // Placeholder data from the wireframe. A null mark means "Pending".
-  static const List<({String code, String name, double? mark})> _grades = [
-    (code: 'ITMDA3-34', name: 'Project - Mobile & Web Services', mark: 78.0),
-    (code: 'ITMTA3-33', name: 'Calculus Mathematics', mark: 64.0),
+  static const _navy = PortalAppBar.navy;
+  static const _cardFill = Color(0xFFF4F7FA);
+  static const _cardBorder = Color(0xFFB0C4DE);
+  static const _markBlue = Color(0xFF4FC3F7);
+  static const _flagRed = Color(0xFFD32F2F);
+  static const _syncedGreen = Color(0xFF4CD964);
+
+  static const List<_GradeRow> _grades = [
+    (code: 'ITMDA3-34', name: 'Project - Mobile & Web Services', mark: 84.0),
+    (code: 'ITMTA3-33', name: 'Calculus Mathematics', mark: 72.0),
     (code: 'ITOPE3-33', name: 'Operating Systems', mark: null),
   ];
 
-  /// Asks for the reason, validates it, then confirms the query was queued.
   Future<void> _showGradeQueryDialog(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     final submitted = await showDialog<bool>(
@@ -56,46 +62,112 @@ class GradesScreen extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Grades'),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: OfflineBadge(isOnline: true),
+  Widget _gradeCard(_GradeRow grade) {
+    final isPending = grade.mark == null;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: _cardFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _cardBorder, width: 2),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  grade.code,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: _navy,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  grade.name,
+                  style: TextStyle(fontSize: 15, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isPending ? 'Pending' : '${grade.mark!.toStringAsFixed(0)}%',
+            style: TextStyle(
+              fontSize: isPending ? 24 : 28,
+              fontWeight: FontWeight.bold,
+              color: isPending ? _navy : _markBlue,
+            ),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          for (final grade in _grades)
-            Card(
-              child: ListTile(
-                title: Text(
-                  grade.code,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(grade.name),
-                trailing: Text(
-                  grade.mark == null
-                      ? 'Pending'
-                      : '${grade.mark!.toStringAsFixed(0)}%',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: const PortalAppBar(title: 'My Grades'),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  for (final grade in _grades) _gradeCard(grade),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      height: 52,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _flagRed,
+                          side: const BorderSide(color: _flagRed, width: 2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        onPressed: () => _showGradeQueryDialog(context),
+                        child: const Text('Flag a grade query'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () => _showGradeQueryDialog(context),
-            icon: const Icon(Icons.flag_outlined),
-            label: const Text('Flag a grade query'),
-          ),
-          const SizedBox(height: 16),
-          const Text('Last synced 2 minutes ago', textAlign: TextAlign.center),
-        ],
+            const Padding(
+              padding: EdgeInsets.fromLTRB(32, 0, 32, 16),
+              child: Column(
+                children: [
+                  Divider(),
+                  SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.circle, size: 14, color: _syncedGreen),
+                      SizedBox(width: 6),
+                      Text(
+                        'Last synced 2 minutes ago',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
