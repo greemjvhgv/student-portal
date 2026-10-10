@@ -8,12 +8,14 @@ import '../widgets/offline_badge.dart';
 class GradesScreen extends StatelessWidget {
   const GradesScreen({super.key});
 
+  // Placeholder data from the wireframe. A null mark means "Pending".
   static const List<({String code, String name, double? mark})> _grades = [
     (code: 'ITMDA3-34', name: 'Project - Mobile & Web Services', mark: 78.0),
     (code: 'ITMTA3-33', name: 'Calculus Mathematics', mark: 64.0),
     (code: 'ITOPE3-33', name: 'Operating Systems', mark: null),
   ];
 
+  /// Asks for the reason, validates it, then confirms the query was queued.
   Future<void> _showGradeQueryDialog(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     final submitted = await showDialog<bool>(
