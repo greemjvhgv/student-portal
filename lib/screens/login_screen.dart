@@ -1,20 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// Matches the Login wireframe (D3 Figure 3): student number + password
-/// fields, a Log In button, and a footer note that the app works offline
-/// once logged in. This one's built out as a worked example — copy this
-/// file's shape (StatefulWidget + a form + a loading state) for the other
-/// screens.
+/// Login screen (D3 Figure 3): navy "Student Portal" bar, Eduvos logo,
+/// student number + password fields, a Log In button and a footer note
+/// that the app works offline once logged in.
 ///
-/// TODO:
-///   - wire `_handleLogin` to call POST /auth/login (see
-///     docs/API_CONTRACT.md) via an ApiService you add to lib/services/
-///   - on success, save the token + student_id (local_db_service.dart can
-///     hold a tiny "current session" table for this) and navigate to
-///     DashboardScreen
-///   - show a real error state (wrong credentials, no connection — login
-///     itself needs a first-time connection; offline-first starts *after*
-///     login, per the wireframe's footer note)
+/// TODO (when Ruan's POST /auth/login exists): replace the placeholder in
+/// [_handleLogin] with the real call, save the token, and show real errors
+/// (wrong password, no connection) through [_errorText].
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -23,6 +15,15 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _navy = Color(0xFF0B2545);
+  static const _fieldFill = Color(0xFFF4F7FA);
+  static const _fieldBorder = Color(0xFFB0C4DE);
+  static const _taglineBlue = Color(0xFF1E88E5);
+
+  static final RegExp _studentNumberPattern =
+      RegExp(r'^EDUV\d{7}$', caseSensitive: false);
+
+  final _formKey = GlobalKey<FormState>();
   final _studentNumberController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -36,6 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() {
       _isLoading = true;
       _errorText = null;
@@ -45,69 +48,137 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future.delayed(const Duration(milliseconds: 600));
 
     if (!mounted) return;
-    setState(() {
-      Navigator.pushReplacementNamed(context, '/dashboard');
-    });
+    Navigator.pushReplacementNamed(context, '/dashboard');
+  }
+
+  InputDecoration _fieldDecoration(String hint) {
+    OutlineInputBorder border(Color color) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: color, width: 2),
+        );
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: _fieldFill,
+      enabledBorder: border(_fieldBorder),
+      focusedBorder: border(_navy),
+      errorBorder: border(Colors.red),
+      focusedErrorBorder: border(Colors.red),
+    );
+  }
+
+  Widget _label(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(text, style: const TextStyle(fontSize: 16)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: _navy,
+        foregroundColor: Colors.white,
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        title: const Text(
+          'Student Portal',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: Form(
+            key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // TODO: swap for the real Eduvos crest asset once added to
-                // the assets/ folder and declared in pubspec.yaml.
-                const Icon(Icons.school, size: 64),
-                const SizedBox(height: 8),
+                // TODO: swap for the real Eduvos crest image once it is in assets/.
+                const Icon(Icons.school, size: 72, color: _navy),
                 const Text(
-                  'Student Portal',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  'Eduvos',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'serif',
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                    color: _navy,
+                  ),
+                ),
+                const Text(
+                  'Your Education. Your Future.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _taglineBlue),
                 ),
                 const SizedBox(height: 32),
-                TextField(
+                _label('Student Number'),
+                TextFormField(
                   controller: _studentNumberController,
-                  decoration: const InputDecoration(
-                    labelText: 'Student Number',
-                    hintText: 'e.g. EDUV1234567',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: _fieldDecoration('e.g. EDUV1234567'),
+                  textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.isEmpty) return 'Enter your student number';
+                    if (!_studentNumberPattern.hasMatch(text)) {
+                      return 'Use the format EDUV1234567';
+                    }
+                    return null;
+                  },
                 ),
-                const SizedBox(height: 16),
-                TextField(
+                const SizedBox(height: 20),
+                _label('Password'),
+                TextFormField(
                   controller: _passwordController,
+                  decoration: _fieldDecoration('••••••••••'),
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
-                  ),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _handleLogin(),
+                  validator: (value) =>
+                      (value == null || value.isEmpty) ? 'Enter your password' : null,
                 ),
                 if (_errorText != null) ...[
                   const SizedBox(height: 12),
                   Text(_errorText!, style: const TextStyle(color: Colors.red)),
                 ],
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
                 SizedBox(
-                  width: double.infinity,
+                  height: 52,
                   child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _navy,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     onPressed: _isLoading ? null : _handleLogin,
                     child: _isLoading
                         ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Log In'),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 32),
+                const Divider(),
+                const SizedBox(height: 4),
                 const Text(
-                  'Works offline once logged in',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                  'Works Offline once logged in',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
                 ),
               ],
             ),
