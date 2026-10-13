@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import '../models/grade.dart';
+import '../services/local_db_service.dart';
 import '../widgets/portal_app_bar.dart';
 
-typedef _GradeRow = ({String code, String name, double? mark});
-
-/// My Grades (D3 Figure 5): one card per module with its mark or
-/// "Pending", a "Flag a grade query" button and a "Last synced" footer.
-/// Uses placeholder data until LocalDbService is built.
-class GradesScreen extends StatelessWidget {
+class GradesScreen extends StatefulWidget {
   const GradesScreen({super.key});
+  @override
+  State<GradesScreen> createState() => _GradesScreenState();
+}
 
+class _GradesScreenState extends State<GradesScreen> {
   static const _navy = PortalAppBar.navy;
   static const _cardFill = Color(0xFFF4F7FA);
   static const _cardBorder = Color(0xFFB0C4DE);
@@ -16,11 +17,7 @@ class GradesScreen extends StatelessWidget {
   static const _flagRed = Color(0xFFD32F2F);
   static const _syncedGreen = Color(0xFF4CD964);
 
-  static const List<_GradeRow> _grades = [
-    (code: 'ITMDA3-34', name: 'Project - Mobile & Web Services', mark: 84.0),
-    (code: 'ITMTA3-33', name: 'Calculus Mathematics', mark: 72.0),
-    (code: 'ITOPE3-33', name: 'Operating Systems', mark: null),
-  ];
+  final Future<List<Grade>> _gradesFuture = LocalDbService.instance.getGrades();
 
   Future<void> _showGradeQueryDialog(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
@@ -62,7 +59,7 @@ class GradesScreen extends StatelessWidget {
     );
   }
 
-  Widget _gradeCard(_GradeRow grade) {
+  Widget _gradeCard(Grade grade) {
     final isPending = grade.mark == null;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -79,7 +76,7 @@ class GradesScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  grade.code,
+                  grade.moduleCode,
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
@@ -88,7 +85,7 @@ class GradesScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  grade.name,
+                  grade.moduleName ?? '',
                   style: TextStyle(fontSize: 15, color: Colors.grey.shade700),
                 ),
               ],
@@ -120,7 +117,27 @@ class GradesScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  for (final grade in _grades) _gradeCard(grade),
+                  FutureBuilder<List<Grade>>(
+                    future: _gradesFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState != ConnectionState.done) {
+                        return const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      if (snapshot.hasError) {
+                        return const Text('Could not load grades from this device.');
+                      }
+                      final grades = snapshot.data!;
+                      if (grades.isEmpty) {
+                        return const Text('No grades yet.');
+                      }
+                      return Column(
+                        children: [for (final grade in grades) _gradeCard(grade)],
+                      );
+                    },
+                  ),
                   const SizedBox(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
