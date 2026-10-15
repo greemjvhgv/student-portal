@@ -5,7 +5,7 @@ GET /assignments/{student_id} returns assignments for a student.
 POST /assignments/{id}/submit updates the student's submission status.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
@@ -13,6 +13,12 @@ from app.database import get_db
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.course import Course
+
+from app.api.deps import require_authenticated_student
+from app.services.submission_files import (
+    save_submission_file,
+    delete_submission_file,
+)
 
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
@@ -85,4 +91,39 @@ def submit_assignment(
         "assignment_id": assignment_id
     }
 
+@router.put("/submissions/{submission_id}")
+async def update_submission(
+    submission_id: int,
+    file: UploadFile = File(...),
+    student=Depends(require_authenticated_student),
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing submission.
+
+    Access is temporarily blocked until student
+    authentication and ownership verification
+    are implemented.
+    """
+    raise HTTPException(
+        status_code=503,
+        detail="Submission updates require authentication."
+    )
+
+@router.delete("/submissions/{submission_id}")
+def delete_submission(
+    submission_id: int,
+    student=Depends(require_authenticated_student),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a student submission.
+
+    Access remains blocked until authentication
+    and student ownership verification are available.
+    """
+    raise HTTPException(
+        status_code=503,
+        detail="Submission deletion requires authentication."
+    )
     
