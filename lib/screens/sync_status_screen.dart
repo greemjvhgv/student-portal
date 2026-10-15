@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../models/pending_change.dart';
+import '../services/connectivity_service.dart';
+import '../services/local_db_service.dart';
+import '../services/sync_service.dart';
+import '../utils/time_format.dart';
 import '../widgets/portal_app_bar.dart';
 import 'conflict_resolution_screen.dart';
 
-
-/// Placeholder until SyncService exists. TEMPORARY: tap the status card
-/// to switch Offline/Online so both states can be tested.
 class SyncStatusScreen extends StatefulWidget {
   const SyncStatusScreen({super.key});
 
@@ -20,82 +22,90 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
   static const _syncedFill = Color(0xFFF4F7FA);
   static const _syncedBorder = Color(0xFFB0C4DE);
 
-  // TODO: replace with the real connection state (connectivity_plus).
-  bool _isOnline = false;
+  late Future<List<PendingChange>> _pendingFuture;
+  late Future<List<PendingChange>> _syncedFuture;
+  bool _isSyncing = false;
 
-  static const List<({String title, String time})> _pending = [
-    (title: 'Assignment: Deliverable 3', time: 'Queued 12 min ago'),
-    (title: 'Grade query - ITOPE3-33', time: 'Queued 40 min ago'),
-    (title: 'Profile update', time: 'Queued 1 hr ago'),
-  ];
-  static const List<({String title, String time})> _synced = [
-    (title: 'Timetable refreshed', time: 'Synced 2 hrs ago'),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadQueue();
+    SyncService.instance.changes.addListener(_onSyncChanged);
+  }
 
-  void _syncNow() {
-    if (!_isOnline) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "You're offline – sync will resume automatically when you're back online",
-          ),
-        ),
+  @override
+  void dispose() {
+    SyncService.instance.changes.removeListener(_onSyncChanged);
+    super.dispose();
+  }
+
+  void _loadQueue() {
+    _pendingFuture = LocalDbService.instance.getPendingChanges();
+    _syncedFuture = LocalDbService.instance.getRecentlySynced();
+  }
+
+  void _onSyncChanged() {
+    if (mounted) setState(_loadQueue);
+  }
+
+  Future<void> _syncNow() async {
+    setState(() => _isSyncing = true);
+    final result = await SyncService.instance.syncNow();
+    if (!mounted) return;
+    setState(() => _isSyncing = false);
+    if (result.conflicts.isNotEmpty) {
+      await showConflictResolvedDialog(
+        context,
+        recordName: result.conflicts.first['label'] as String,
       );
       return;
     }
-    showConflictResolvedDialog(
-      context,
-      moduleCode: 'ITOPE3-33',
-      lecturerUpdateTime: '14:01',
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.error ?? result.summary)),
     );
   }
 
-  Widget _statusCard() {
-    final fill = _isOnline ? const Color(0xFFEFFAF1) : const Color(0xFFFFF1F1);
-    final border = _isOnline ? const Color(0xFF81C784) : const Color(0xFFFF8A8A);
-    final dot = _isOnline ? const Color(0xFF4CD964) : const Color(0xFFD32F2F);
-    final text = _isOnline ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C);
-    return GestureDetector(
-      onTap: () => setState(() => _isOnline = !_isOnline),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: border, width: 3),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.circle, size: 28, color: dot),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _isOnline ? 'Online' : 'Offline',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: text,
-                    ),
+  Widget _statusCard(bool isOnline) {
+    final fill = isOnline ? const Color(0xFFEFFAF1) : const Color(0xFFFFF1F1);
+    final border = isOnline ? const Color(0xFF81C784) : const Color(0xFFFF8A8A);
+    final dot = isOnline ? const Color(0xFF4CD964) : const Color(0xFFD32F2F);
+    final text = isOnline ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border, width: 3),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.circle, size: 28, color: dot),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: text,
                   ),
-                  Text(
-                    _isOnline
-                        ? 'Ready to sync'
-                        : 'Sync will resume automatically',
-                    style: TextStyle(fontSize: 16, color: text),
-                  ),
-                ],
-              ),
+                ),
+                Text(
+                  isOnline ? 'Ready to sync' : 'Sync will resume automatically',
+                  style: TextStyle(fontSize: 16, color: text),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _itemCard(({String title, String time}) item, Color fill, Color border) {
+  Widget _itemCard(String title, String subtitle, Color fill, Color border) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -107,9 +117,9 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(item.title, style: const TextStyle(fontSize: 17, color: _navy)),
+          Text(title, style: const TextStyle(fontSize: 17, color: _navy)),
           const SizedBox(height: 4),
-          Text(item.time, style: const TextStyle(fontSize: 16, color: _blueText)),
+          Text(subtitle, style: const TextStyle(fontSize: 16, color: _blueText)),
         ],
       ),
     );
@@ -129,6 +139,20 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
     );
   }
 
+  String _pendingSubtitle(PendingChange change) {
+    final retries = change.attempts == 0
+        ? ''
+        : ' \u2022 ${change.attempts} failed attempt${change.attempts == 1 ? '' : 's'}';
+    return 'Queued ${timeAgo(change.createdAt)}$retries';
+  }
+
+  String _syncedSubtitle(PendingChange change) {
+    final when = timeAgo(change.syncedAt ?? change.createdAt);
+    return change.status == 'conflict'
+        ? 'Conflict – server version kept ($when)'
+        : 'Synced $when';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,11 +162,48 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _statusCard(),
-            _heading('Pending items (${_pending.length})'),
-            for (final item in _pending) _itemCard(item, _queueFill, _queueBorder),
-            _heading('Recently synced'),
-            for (final item in _synced) _itemCard(item, _syncedFill, _syncedBorder),
+            ValueListenableBuilder<bool>(
+              valueListenable: ConnectivityService.instance.isOnline,
+              builder: (context, isOnline, _) => _statusCard(isOnline),
+            ),
+            FutureBuilder<List<PendingChange>>(
+              future: _pendingFuture,
+              builder: (context, snapshot) {
+                final pending = snapshot.data ?? const <PendingChange>[];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _heading('Pending items (${pending.length})'),
+                    if (pending.isEmpty)
+                      const Text(
+                        'Nothing waiting – all your changes have been sent.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    for (final change in pending)
+                      _itemCard(change.label, _pendingSubtitle(change), _queueFill, _queueBorder),
+                  ],
+                );
+              },
+            ),
+            FutureBuilder<List<PendingChange>>(
+              future: _syncedFuture,
+              builder: (context, snapshot) {
+                final synced = snapshot.data ?? const <PendingChange>[];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _heading('Recently synced'),
+                    if (synced.isEmpty)
+                      const Text(
+                        'Nothing synced yet.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    for (final change in synced)
+                      _itemCard(change.label, _syncedSubtitle(change), _syncedFill, _syncedBorder),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 24),
             Center(
               child: SizedBox(
@@ -159,8 +220,17 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  onPressed: _syncNow,
-                  child: const Text('Sync Now'),
+                  onPressed: _isSyncing ? null : _syncNow,
+                  child: _isSyncing
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Sync Now'),
                 ),
               ),
             ),

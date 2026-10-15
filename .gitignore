@@ -48,6 +48,6 @@ app.*.map.json
 .widget_preview/
 
 .venv/
-_pycache_/
+__pycache__/
 *.db
 .env

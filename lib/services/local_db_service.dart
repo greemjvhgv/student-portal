@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import '../models/grade.dart';
 import '../models/announcement.dart';
 import '../models/assignment.dart';
 import '../models/course_material.dart';
+import '../models/grade.dart';
+import '../models/pending_change.dart';
 import '../models/timetable_entry.dart';
 
 class LocalDbService {
@@ -11,7 +13,8 @@ class LocalDbService {
   static final LocalDbService instance = LocalDbService._internal();
 
   static const _dbName = 'student_portal.db';
-  static const _dbVersion = 1;
+
+  static const _dbVersion = 2;
 
   Database? _db;
 
@@ -20,6 +23,7 @@ class LocalDbService {
       join(await getDatabasesPath(), _dbName),
       version: _dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -29,6 +33,17 @@ class LocalDbService {
     }
     await _insertPlaceholderData(db);
   }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute(_createAppMeta);
+      await db.execute('ALTER TABLE pending_sync ADD COLUMN synced_at TEXT');
+      await _insertSampleAssignments(db);
+    }
+  }
+
+  static const _createAppMeta =
+      'CREATE TABLE app_meta (key TEXT PRIMARY KEY, value TEXT)';
 
   static const List<String> _createTables = [
     'CREATE TABLE grades ('
@@ -68,7 +83,9 @@ class LocalDbService {
         'payload TEXT NOT NULL, '
         'created_at TEXT NOT NULL, '
         "status TEXT NOT NULL DEFAULT 'pending', "
-        'attempts INTEGER NOT NULL DEFAULT 0)',
+        'attempts INTEGER NOT NULL DEFAULT 0, '
+        'synced_at TEXT)',
+    _createAppMeta,
   ];
 
   Future<void> _insertPlaceholderData(Database db) async {
@@ -82,14 +99,6 @@ class LocalDbService {
     ]) {
       batch.insert('grades', {...grade, 'updated_at': now.toIso8601String()});
     }
-
-    batch.insert('assignments', {
-      'id': 1,
-      'module_code': 'ITMDA3-34',
-      'title': 'Deliverable 4',
-      'status': 'not_submitted',
-      'due_date': now.add(const Duration(days: 14)).toIso8601String(),
-    });
 
     for (final entry in [
       {'module_code': 'ITMDA3-34', 'day': 'Monday', 'time': '15:00', 'type': 'Consultation'},
@@ -119,7 +128,24 @@ class LocalDbService {
     }
 
     await batch.commit(noResult: true);
+    await _insertSampleAssignments(db);
   }
+
+  Future<void> _insertSampleAssignments(Database db) async {
+    final now = DateTime.now();
+    String dueIn(int days) =>
+        DateTime(now.year, now.month, now.day + days, 23, 59).toUtc().toIso8601String();
+
+    for (final assignment in [
+      {'id': 1, 'module_code': 'ITMDA3-34', 'title': 'Deliverable 4', 'status': 'not_submitted', 'due_date': dueIn(14)},
+      {'id': 2, 'module_code': 'ITMTA3-33', 'title': 'Assignment 2: Integration', 'status': 'not_submitted', 'due_date': dueIn(7)},
+      {'id': 3, 'module_code': 'ITOPE3-33', 'title': 'Practical 3: Scheduling', 'status': 'not_submitted', 'due_date': dueIn(21)},
+    ]) {
+      await db.insert('assignments', assignment, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+  }
+
+  // ---------------------------------------------------------------- Reading
 
   Future<List<Grade>> getGrades() async {
     final db = await database;
@@ -149,5 +175,134 @@ class LocalDbService {
     final db = await database;
     final rows = await db.query('assignments', orderBy: 'due_date');
     return rows.map((row) => Assignment.fromJson(row)).toList();
+  }
+
+  // ---------------------------------------------------------- Offline queue
+  Future<void> queueAssignmentSubmission(
+    Assignment assignment, {
+    required String fileName,
+    String? notes,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await db.transaction((txn) async {
+      await txn.update('assignments', {'status': 'queued'},
+          where: 'id = ?', whereArgs: [assignment.id]);
+      await txn.insert('pending_sync', {
+        'entity_type': 'assignments',
+        'entity_id': assignment.id,
+        'operation_type': 'submit',
+        'payload': jsonEncode({
+          'title': assignment.title,
+          'module_code': assignment.moduleCode,
+          'status': 'submitted',
+          'file_name': fileName,
+          'notes': notes,
+          'client_updated_at': now,
+        }),
+        'created_at': now,
+      });
+    });
+  }
+
+  Future<void> queueGradeQuery(Grade grade, String reason) async {
+    final db = await database;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await db.insert('pending_sync', {
+      'entity_type': 'grade_queries',
+      'entity_id': grade.id ?? 0,
+      'operation_type': 'create',
+      'payload': jsonEncode({
+        'module_code': grade.moduleCode,
+        'reason': reason,
+        'client_updated_at': now,
+      }),
+      'created_at': now,
+    });
+  }
+
+  Future<List<PendingChange>> getPendingChanges() async {
+    final db = await database;
+    final rows = await db.query('pending_sync',
+        where: "status IN ('pending', 'failed')", orderBy: 'created_at');
+    return rows.map(PendingChange.fromRow).toList();
+  }
+
+  Future<List<PendingChange>> getRecentlySynced({int limit = 5}) async {
+    final db = await database;
+    final rows = await db.query('pending_sync',
+        where: "status IN ('synced', 'conflict')",
+        orderBy: 'synced_at DESC',
+        limit: limit);
+    return rows.map(PendingChange.fromRow).toList();
+  }
+
+  Future<void> markChangeSynced(int syncId) => _finishChange(syncId, 'synced');
+
+  Future<void> markChangeConflict(int syncId) => _finishChange(syncId, 'conflict');
+
+  Future<void> _finishChange(int syncId, String status) async {
+    final db = await database;
+    await db.update(
+      'pending_sync',
+      {'status': status, 'synced_at': DateTime.now().toUtc().toIso8601String()},
+      where: 'sync_id = ?',
+      whereArgs: [syncId],
+    );
+  }
+
+  Future<void> recordFailedAttempt(int syncId) async {
+    final db = await database;
+    await db.rawUpdate(
+      "UPDATE pending_sync SET attempts = attempts + 1, status = 'failed' WHERE sync_id = ?",
+      [syncId],
+    );
+  }
+
+  Future<void> setAssignmentStatus(int assignmentId, String status) async {
+    final db = await database;
+    await db.update('assignments', {'status': status},
+        where: 'id = ?', whereArgs: [assignmentId]);
+  }
+
+  Future<void> saveServerSnapshot(Map<String, dynamic> data) async {
+    final db = await database;
+    final queuedIds = {
+      for (final change in await getPendingChanges())
+        if (change.entityType == 'assignments') change.entityId,
+    };
+    await db.transaction((txn) async {
+      for (final table in ['assignments', 'grades', 'timetable', 'announcements']) {
+        final rows = data[table];
+        if (rows is! List) continue;
+        await txn.delete(table);
+        for (final row in rows) {
+          final values = Map<String, Object?>.from(row as Map);
+          if (table == 'assignments' && queuedIds.contains(values['id'])) {
+            values['status'] = 'queued';
+          }
+          await txn.insert(table, values);
+        }
+      }
+    });
+  }
+
+  // ------------------------------------------------------------- App values
+
+  Future<String?> getMeta(String key) async {
+    final db = await database;
+    final rows = await db.query('app_meta', where: 'key = ?', whereArgs: [key]);
+    return rows.isEmpty ? null : rows.first['value'] as String?;
+  }
+
+  Future<void> setMeta(String key, String value) async {
+    final db = await database;
+    await db.insert('app_meta', {'key': key, 'value': value},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<DateTime?> getLastSyncedAt() async {
+    final value = await getMeta('last_synced_at');
+    return value == null ? null : DateTime.parse(value);
   }
 }
