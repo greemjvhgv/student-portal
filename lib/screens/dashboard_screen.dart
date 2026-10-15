@@ -5,8 +5,8 @@ import '../services/local_db_service.dart';
 import 'announcements_screen.dart';
 import 'announcement_detail_screen.dart';
 import 'timetable_screen.dart';
+import '../services/connectivity_service.dart';
 
-/// Built by Charleen; connected to the local database by Annuschka.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -292,7 +292,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildHeaderTitle(BuildContext context) {
+    Widget _buildHeaderTitle(BuildContext context) {
     return Row(
       children: [
         Container(
@@ -311,17 +311,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
         ),
         const Spacer(),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 14,
-              height: 14,
-              decoration: const BoxDecoration(color: Color(0xFF4CD964), shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 6),
-            const Text('Online', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
-          ],
+        ValueListenableBuilder<bool>(
+          valueListenable: ConnectivityService.instance.isOnline,
+          builder: (context, isOnline, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: isOnline ? const Color(0xFF4CD964) : const Color(0xFFFF5252),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isOnline ? 'Online' : 'Offline',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
         ),
       ],
     );

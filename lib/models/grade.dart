@@ -1,11 +1,12 @@
-
 class Grade {
+  final int? id;
   final String moduleCode;
   final String? moduleName;
   final double? mark;
   final DateTime? updatedAt;
 
   const Grade({
+    this.id,
     required this.moduleCode,
     this.moduleName,
     this.mark,
@@ -13,6 +14,7 @@ class Grade {
   });
 
   factory Grade.fromJson(Map<String, dynamic> json) => Grade(
+        id: json['id'] as int?,
         moduleCode: json['module_code'] as String,
         moduleName: json['module_name'] as String?,
         mark: (json['mark'] as num?)?.toDouble(),
