@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import '../widgets/portal_app_bar.dart';
+import '../models/course_material.dart';
+import '../services/local_db_service.dart';
 import '../widgets/dashed_border_painter.dart';
+import '../widgets/portal_app_bar.dart';
 
-typedef _Material = ({String module, String title, bool cached});
-
-/// Course Materials (D3 Figure 4): files grouped by module. Cached files
-/// have a blue box and "Cached ✓"; files not yet downloaded have a red
-/// dashed box. Uses placeholder data until LocalDbService is built.
-class CourseMaterialsScreen extends StatelessWidget {
+class CourseMaterialsScreen extends StatefulWidget {
   const CourseMaterialsScreen({super.key});
 
+  @override
+  State<CourseMaterialsScreen> createState() => _CourseMaterialsScreenState();
+}
+
+class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
   static const _navy = PortalAppBar.navy;
   static const _cachedFill = Color(0xFFF4F9FC);
   static const _cachedBorder = Color(0xFF81D4FA);
@@ -21,22 +23,17 @@ class CourseMaterialsScreen extends StatelessWidget {
   static const _warningBorder = Color(0xFFFFD54F);
   static const _warningText = Color(0xFF8D4A00);
 
-  static const List<_Material> _materials = [
-    (module: 'ITMDA3-34', title: 'Week 6 - Lecture Slides.pdf', cached: true),
-    (module: 'ITMDA3-34', title: 'Study Guide - Databases.pdf', cached: false),
-    (module: 'ITMTA3-33', title: 'Week 6 - Lecture Slides.pdf', cached: true),
-    (module: 'ITMTA3-33', title: 'Week 6 - Course Slides.pdf', cached: true),
-    (module: 'ITOPE3-33', title: 'Week 6 - Lecture Slides.pdf', cached: true),
-  ];
+  final Future<List<CourseMaterial>> _materialsFuture =
+      LocalDbService.instance.getCourseMaterials();
 
-  void _openMaterial(BuildContext context, _Material material) {
-    final message = material.cached
+  void _openMaterial(CourseMaterial material) {
+    final message = material.isCached
         ? 'Opening ${material.title}'
         : '${material.title} is not downloaded yet – it will download when you are online';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Widget _materialTile(BuildContext context, _Material material) {
+  Widget _materialTile(CourseMaterial material) {
     final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       child: Row(
@@ -47,11 +44,11 @@ class CourseMaterialsScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 letterSpacing: 0.6,
-                color: material.cached ? _navy : _missingText,
+                color: material.isCached ? _navy : _missingText,
               ),
             ),
           ),
-          if (material.cached)
+          if (material.isCached)
             const Text(
               'Cached ✓',
               style: TextStyle(fontSize: 16, color: _cachedBlue),
@@ -64,8 +61,8 @@ class CourseMaterialsScreen extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => _openMaterial(context, material),
-        child: material.cached
+        onTap: () => _openMaterial(material),
+        child: material.isCached
             ? Container(
                 decoration: BoxDecoration(
                   color: _cachedFill,
@@ -88,10 +85,29 @@ class CourseMaterialsScreen extends StatelessWidget {
     );
   }
 
+  List<Widget> _groupedByModule(List<CourseMaterial> materials) {
+    final modules = {for (final material in materials) material.moduleCode};
+    return [
+      for (final module in modules) ...[
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 6),
+          child: Text(
+            module,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: _navy,
+            ),
+          ),
+        ),
+        for (final material in materials.where((m) => m.moduleCode == module))
+          _materialTile(material),
+      ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final modules = {for (final material in _materials) material.module}.toList();
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: const PortalAppBar(title: 'Course Materials'),
@@ -99,21 +115,28 @@ class CourseMaterialsScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            for (final module in modules) ...[
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 6),
-                child: Text(
-                  module,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: _navy,
-                  ),
-                ),
-              ),
-              for (final material in _materials.where((m) => m.module == module))
-                _materialTile(context, material),
-            ],
+            FutureBuilder<List<CourseMaterial>>(
+              future: _materialsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return const Text('Could not load course materials from this device.');
+                }
+                final materials = snapshot.data!;
+                if (materials.isEmpty) {
+                  return const Text('No course materials yet.');
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _groupedByModule(materials),
+                );
+              },
+            ),
             const SizedBox(height: 16),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 8),

@@ -1,6 +1,10 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/grade.dart';
+import '../models/announcement.dart';
+import '../models/assignment.dart';
+import '../models/course_material.dart';
+import '../models/timetable_entry.dart';
 
 class LocalDbService {
   LocalDbService._internal();
@@ -121,5 +125,29 @@ class LocalDbService {
     final db = await database;
     final rows = await db.query('grades', orderBy: 'module_code');
     return rows.map((row) => Grade.fromJson(row)).toList();
+  }
+
+  Future<List<CourseMaterial>> getCourseMaterials() async {
+    final db = await database;
+    final rows = await db.query('course_materials', orderBy: 'module_code, id');
+    return rows.map((row) => CourseMaterial.fromJson(row)).toList();
+  }
+
+  Future<List<TimetableEntry>> getTimetable() async {
+    final db = await database;
+    final rows = await db.query('timetable', orderBy: 'id');
+    return rows.map((row) => TimetableEntry.fromJson(row)).toList();
+  }
+
+  Future<List<Announcement>> getAnnouncements() async {
+    final db = await database;
+    final rows = await db.query('announcements', orderBy: 'posted_at DESC');
+    return rows.map((row) => Announcement.fromJson(row)).toList();
+  }
+
+  Future<List<Assignment>> getAssignments() async {
+    final db = await database;
+    final rows = await db.query('assignments', orderBy: 'due_date');
+    return rows.map((row) => Assignment.fromJson(row)).toList();
   }
 }
