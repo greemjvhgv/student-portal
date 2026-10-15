@@ -49,3 +49,7 @@ app.*.map.json
 
 # Local backend database
 backend/student_portal.db
+.venv/
+__pycache__/
+*.db
+.env

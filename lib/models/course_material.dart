@@ -1,15 +1,29 @@
-/// Mirrors GET /course-materials/{module_code} — see docs/API_CONTRACT.md.
-/// Backs US04 / the Course Materials wireframe.
 class CourseMaterial {
+  final String moduleCode;
   final String title;
-  final String fileUrl;
+  final String? fileUrl;
+  final String? localPath;
 
-  CourseMaterial({required this.title, required this.fileUrl});
+  const CourseMaterial({
+    required this.moduleCode,
+    required this.title,
+    this.fileUrl,
+    this.localPath,
+  });
+
+  bool get isCached => localPath != null;
 
   factory CourseMaterial.fromJson(Map<String, dynamic> json) => CourseMaterial(
-        title: json['title'],
-        fileUrl: json['file_url'],
+        moduleCode: json['module_code'] as String? ?? '',
+        title: json['title'] as String,
+        fileUrl: json['file_url'] as String?,
+        localPath: json['local_path'] as String?,
       );
 
-  Map<String, dynamic> toJson() => {'title': title, 'file_url': fileUrl};
+  Map<String, dynamic> toJson() => {
+        'module_code': moduleCode,
+        'title': title,
+        'file_url': fileUrl,
+        'local_path': localPath,
+      };
 }
