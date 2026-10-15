@@ -1,8 +1,9 @@
 """
-Owner: Adnan (D3 Data Design ERD). Starting point — check against your
-actual diagram and adjust.
+Owner: Adnan
+student profile model for student portal
 """
 from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -14,3 +15,8 @@ class Student(Base):
     student_number = Column(String, unique=True, index=True, nullable=False)
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
+
+    #allows student account access through the profile
+    user = relationship("User")
+
+
