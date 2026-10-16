@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../services/sync_service.dart';
 
 /// Login screen (D3 Figure 3): navy "Student Portal" bar, Eduvos logo,
 /// student number + password fields, a Log In button and a footer note
 /// that the app works offline once logged in.
 ///
 /// Logs in through [AuthService] and shows failures (wrong password, no
-/// connection) through [_errorText].
+/// connection) through [_errorText]. After a successful login the
+/// student's data is downloaded in the background (FR3).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -58,6 +60,9 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       return;
     }
+
+    // Download the student's data in the background (FR3).
+    SyncService.instance.syncNow();
 
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/dashboard');

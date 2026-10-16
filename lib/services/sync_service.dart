@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'api_service.dart';
+import 'auth_service.dart';
 import 'connectivity_service.dart';
 import 'local_db_service.dart';
 
@@ -25,13 +26,14 @@ class SyncResult {
         ? ' $waiting grade quer${waiting == 1 ? 'y is' : 'ies are'} waiting until the server supports them.'
         : '';
     if (!contactedServer) return 'Nothing to send.$waitingNote';
-    return 'Synced $pushed item${pushed == 1 ? '' : 's'}.$waitingNote';
+    return 'Synced – $pushed change${pushed == 1 ? '' : 's'} sent, latest data downloaded.$waitingNote';
   }
 }
 
 class SyncService {
   SyncService._internal();
   static final SyncService instance = SyncService._internal();
+
   final ValueNotifier<int> changes = ValueNotifier<int>(0);
 
   bool _isSyncing = false;
@@ -58,60 +60,69 @@ class SyncService {
     }
     _isSyncing = true;
     final db = LocalDbService.instance;
-    final pending = await db.getPendingChanges();
-    final pushable = pending.where((c) => c.entityType == 'assignments').toList();
-    final waiting = pending.length - pushable.length;
-    var contacted = false;
 
     try {
-      var conflicts = <Map<String, dynamic>>[];
+      final pending = await db.getPendingChanges();
+      final pushable = pending.where((c) => c.entityType == 'assignments').toList();
+      final waiting = pending.length - pushable.length;
+      final conflicts = <Map<String, dynamic>>[];
+      var pushed = 0;
+      var contacted = false;
+      String? error;
+
       if (pushable.isNotEmpty) {
-        final response = await ApiService.instance.pushChanges([
-          for (final change in pushable)
-            {
-              'table': 'assignments',
-              'id': change.entityId,
-              'status': change.payload['status'],
-              'client_updated_at': change.payload['client_updated_at'],
-            },
-        ]);
-        contacted = true;
-        final conflictIds = {
-          for (final c in response['conflicts'] as List? ?? const []) (c as Map)['id'],
-        };
-        for (final change in pushable) {
-          if (conflictIds.contains(change.entityId)) {
-            await db.markChangeConflict(change.syncId);
-            conflicts.add({'id': change.entityId, 'label': change.label});
-          } else {
-            await db.markChangeSynced(change.syncId);
-            await db.setAssignmentStatus(change.entityId, 'submitted');
+        try {
+          final response = await ApiService.instance.pushChanges([
+            for (final change in pushable)
+              {
+                'table': 'assignments',
+                'id': change.entityId,
+                'status': change.payload['status'],
+                'client_updated_at': change.payload['client_updated_at'],
+              },
+          ]);
+          contacted = true;
+          final conflictIds = {
+            for (final c in response['conflicts'] as List? ?? const []) (c as Map)['id'],
+          };
+          for (final change in pushable) {
+            if (conflictIds.contains(change.entityId)) {
+              await db.markChangeConflict(change.syncId);
+              conflicts.add({'id': change.entityId, 'label': change.label});
+            } else {
+              await db.markChangeSynced(change.syncId);
+              await db.setAssignmentStatus(change.entityId, 'submitted');
+              pushed++;
+            }
           }
+        } on ApiException catch (e) {
+          for (final change in pushable) {
+            await db.recordFailedAttempt(change.syncId);
+          }
+          error = 'Queued changes not sent: ${e.message}';
         }
       }
 
-      final studentId = await db.getMeta('student_id');
+      final studentId = await AuthService.getStudentId();
       if (studentId != null) {
-        await db.saveServerSnapshot(
-          await ApiService.instance.pullChanges(int.parse(studentId)),
-        );
-        contacted = true;
+        try {
+          await db.saveServerSnapshot(await ApiService.instance.pullChanges(studentId));
+          contacted = true;
+        } on ApiException catch (e) {
+          error ??= 'Could not download the latest data: ${e.message}';
+        }
       }
 
       if (contacted) {
         await db.setMeta('last_synced_at', DateTime.now().toUtc().toIso8601String());
       }
       return SyncResult(
-        pushed: pushable.length - conflicts.length,
+        pushed: pushed,
         waiting: waiting,
         conflicts: conflicts,
         contactedServer: contacted,
+        error: error,
       );
-    } on ApiException catch (e) {
-      for (final change in pushable) {
-        await db.recordFailedAttempt(change.syncId);
-      }
-      return SyncResult(waiting: waiting, error: e.message);
     } finally {
       _isSyncing = false;
       notifyLocalChange();

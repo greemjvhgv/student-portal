@@ -265,11 +265,15 @@ class LocalDbService {
         where: 'id = ?', whereArgs: [assignmentId]);
   }
 
-  Future<void> saveServerSnapshot(Map<String, dynamic> data) async {
+Future<void> saveServerSnapshot(Map<String, dynamic> data) async {
     final db = await database;
     final queuedIds = {
       for (final change in await getPendingChanges())
         if (change.entityType == 'assignments') change.entityId,
+    };
+    final moduleNames = {
+      for (final row in await db.query('grades', columns: ['module_code', 'module_name']))
+        row['module_code']: row['module_name'],
     };
     await db.transaction((txn) async {
       for (final table in ['assignments', 'grades', 'timetable', 'announcements']) {
@@ -281,12 +285,14 @@ class LocalDbService {
           if (table == 'assignments' && queuedIds.contains(values['id'])) {
             values['status'] = 'queued';
           }
+          if (table == 'grades') {
+            values['module_name'] ??= moduleNames[values['module_code']];
+          }
           await txn.insert(table, values);
         }
       }
     });
   }
-
   // ------------------------------------------------------------- App values
 
   Future<String?> getMeta(String key) async {
