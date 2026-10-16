@@ -6,6 +6,7 @@ import 'announcements_screen.dart';
 import 'announcement_detail_screen.dart';
 import 'timetable_screen.dart';
 import '../services/connectivity_service.dart';
+import '../services/auth_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -292,7 +293,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-    Widget _buildHeaderTitle(BuildContext context) {
+  /// Asks for confirmation, clears the saved login, and returns to Login.
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You will need an internet connection to log in again.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
+
+  // Header with logo, "Dashboard" title, live Online/Offline pill and logout.
+  Widget _buildHeaderTitle(BuildContext context) {
     return Row(
       children: [
         Container(
@@ -331,6 +358,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
+        ),
+        IconButton(
+          tooltip: 'Log out',
+          icon: const Icon(Icons.logout, color: Colors.white),
+          onPressed: _confirmLogout,
         ),
       ],
     );
