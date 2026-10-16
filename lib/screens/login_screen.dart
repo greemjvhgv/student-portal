@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+
 /// Login screen (D3 Figure 3): navy "Student Portal" bar, Eduvos logo,
 /// student number + password fields, a Log In button and a footer note
 /// that the app works offline once logged in.
 ///
-/// TODO (when Ruan's POST /auth/login exists): replace the placeholder in
-/// [_handleLogin] with the real call, save the token, and show real errors
-/// (wrong password, no connection) through [_errorText].
+/// Logs in through [AuthService] and shows failures (wrong password, no
+/// connection) through [_errorText].
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -44,8 +45,19 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorText = null;
     });
 
-    // TODO: replace with a real call to POST /auth/login.
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      await AuthService.login(
+        _studentNumberController.text,
+        _passwordController.text,
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorText = e.message;
+      });
+      return;
+    }
 
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/dashboard');

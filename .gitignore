@@ -53,3 +53,4 @@ backend/student_portal.db
 __pycache__/
 *.db
 .env
+.pytest_cache/
