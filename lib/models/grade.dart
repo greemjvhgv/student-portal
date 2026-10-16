@@ -1,20 +1,32 @@
-/// Mirrors GET /grades/{student_id} — see docs/API_CONTRACT.md.
 class Grade {
+  final int? id;
   final String moduleCode;
-  final double mark;
-  final DateTime updatedAt;
+  final String? moduleName;
+  final double? mark;
+  final DateTime? updatedAt;
 
-  Grade({required this.moduleCode, required this.mark, required this.updatedAt});
+  const Grade({
+    this.id,
+    required this.moduleCode,
+    this.moduleName,
+    this.mark,
+    this.updatedAt,
+  });
 
   factory Grade.fromJson(Map<String, dynamic> json) => Grade(
-        moduleCode: json['module_code'],
-        mark: (json['mark'] as num).toDouble(),
-        updatedAt: DateTime.parse(json['updated_at']),
+        id: json['id'] as int?,
+        moduleCode: json['module_code'] as String,
+        moduleName: json['module_name'] as String?,
+        mark: (json['mark'] as num?)?.toDouble(),
+        updatedAt: json['updated_at'] == null
+            ? null
+            : DateTime.parse(json['updated_at'] as String),
       );
 
   Map<String, dynamic> toJson() => {
         'module_code': moduleCode,
+        'module_name': moduleName,
         'mark': mark,
-        'updated_at': updatedAt.toIso8601String(),
+        'updated_at': updatedAt?.toIso8601String(),
       };
 }

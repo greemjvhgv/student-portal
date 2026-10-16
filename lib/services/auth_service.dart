@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import 'sync_service.dart';
+import 'api_service.dart';
 
 /// Thrown by [AuthService.login]; [message] is safe to show to the student.
 class AuthException implements Exception {
@@ -37,7 +37,7 @@ class AuthService {
     try {
       response = await http
           .post(
-            Uri.parse('${SyncService.baseUrl}/auth/login'),
+            Uri.parse('${ApiService.baseUrl}/auth/login'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'student_number': studentNumber.trim().toUpperCase(),

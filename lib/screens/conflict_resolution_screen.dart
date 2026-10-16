@@ -3,14 +3,14 @@ import '../widgets/portal_app_bar.dart';
 
 Future<void> showConflictResolvedDialog(
   BuildContext context, {
-  required String moduleCode,
-  required String lecturerUpdateTime,
+  required String recordName,
+  String? serverUpdateTime,
 }) {
   return showDialog<void>(
     context: context,
     builder: (dialogContext) => ConflictResolvedDialog(
-      moduleCode: moduleCode,
-      lecturerUpdateTime: lecturerUpdateTime,
+      recordName: recordName,
+      serverUpdateTime: serverUpdateTime,
     ),
   );
 }
@@ -18,12 +18,12 @@ Future<void> showConflictResolvedDialog(
 class ConflictResolvedDialog extends StatelessWidget {
   const ConflictResolvedDialog({
     super.key,
-    required this.moduleCode,
-    required this.lecturerUpdateTime,
+    required this.recordName,
+    this.serverUpdateTime,
   });
 
-  final String moduleCode;
-  final String lecturerUpdateTime;
+  final String recordName;
+  final String? serverUpdateTime;
 
   static const _navy = PortalAppBar.navy;
   static const _bodyStyle = TextStyle(fontSize: 16, color: _navy);
@@ -31,6 +31,7 @@ class ConflictResolvedDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navigator = Navigator.of(context);
+    final time = serverUpdateTime == null ? '' : ' ($serverUpdateTime)';
     return Dialog(
       backgroundColor: const Color(0xFFF7F9FC),
       shape: RoundedRectangleBorder(
@@ -54,13 +55,13 @@ class ConflictResolvedDialog extends StatelessWidget {
             ),
             const Divider(height: 28),
             Text(
-              'Your offline grade query for $moduleCode could not be applied as submitted.',
+              'Your offline change to $recordName could not be applied as submitted.',
               style: _bodyStyle,
             ),
             const SizedBox(height: 16),
             Text(
-              "The lecturer's official grade update ($lecturerUpdateTime) was more "
-              'recent and took priority, to protect academic record integrity.',
+              'The official server version$time was more recent and took '
+              'priority, to protect academic record integrity.',
               style: _bodyStyle,
             ),
             const Divider(height: 28),
@@ -84,7 +85,7 @@ class ConflictResolvedDialog extends StatelessWidget {
                     ),
                     onPressed: () {
                       navigator.pop();
-                      navigator.pushNamed('/grades');
+                      navigator.pushNamed('/assignments');
                     },
                     child: const Text(
                       'View Record',

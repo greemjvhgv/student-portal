@@ -47,8 +47,10 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# Backend
-backend/.env
-backend/*.db
+# Local backend database
+backend/student_portal.db
+.venv/
 __pycache__/
+*.db
+.env
 .pytest_cache/

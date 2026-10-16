@@ -1,8 +1,9 @@
 """
-Owner: Adnan (D3 Data Design ERD). Starting point — check against your
-actual diagram and adjust.
+Owner: Adnan
+lecturer and admin profile model
 """
 from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -13,3 +14,7 @@ class LecturerAdmin(Base):
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, unique=True)
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
+
+    #allow access to the account linked to it
+    user = relationship("User")
+
