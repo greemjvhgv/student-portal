@@ -9,6 +9,8 @@ Adnan's GradeQuery model is available.
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import require_authenticated_student
 
+from app.schemas.grade_query import GradeQueryCreate, GradeQueryUpdate
+
 router = APIRouter(
     prefix="/grade-queries",
     tags=["grade queries"]
@@ -16,6 +18,7 @@ router = APIRouter(
 
 @router.post("")
 def create_grade_query(
+    payload: GradeQueryCreate,
     student=Depends(require_authenticated_student)
 ):
     raise HTTPException(
@@ -38,6 +41,7 @@ def get_grade_query(
 @router.put("/{query_id}")
 def update_grade_query(
     query_id: int,
+    payload: GradeQueryUpdate,
     student=Depends(require_authenticated_student)
 ):
     raise HTTPException(
