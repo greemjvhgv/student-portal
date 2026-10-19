@@ -18,18 +18,24 @@ A Flutter app for students affected by load shedding and unstable connectivity. 
 ```
 student_portal/
 ├── lib/
-│   ├── main.dart          app entry point + routes (Annuschka)
+│   ├── main.dart          app entry point + routes
 │   ├── models/            Dart data classes mirroring the API contract
-│   ├── screens/            one file per wireframe screen
-│   ├── services/          local_db_service.dart (sqflite) + sync_service.dart (http)
-│   └── widgets/           shared UI (offline_badge.dart, etc.)
+│   ├── screens/           one file per screen (wireframes D3 Fig 2–8)
+│   ├── services/          local database (sqflite), login, connectivity, API client, sync
+│   ├── utils/             time formatting
+│   └── widgets/           shared UI (app bar, dashed border)
 ├── backend/
-│   └── app/
-│       ├── main.py        FastAPI entry point (Ruan)
-│       ├── database.py    server-side DB setup (Ruan)
-│       ├── models/        SQLAlchemy models matching the D3 ERD (Adnan)
-│       ├── routers/       one file per resource — see docs/folder-ownership.md
-│       └── services/      sync_service.py — the Sync Service Broker (Ofentse)
+│   ├── app/
+│   │   ├── main.py        FastAPI entry point: routers + access rules
+│   │   ├── database.py    server-side SQLite setup
+│   │   ├── seed.py        demo data (6 students, 1 lecturer, courses, …)
+│   │   ├── api/           login checks for students (deps.py, access.py)
+│   │   ├── core/          settings, password hashing, tokens
+│   │   ├── models/        SQLAlchemy models matching the D3 ERD
+│   │   ├── routers/       one file per resource (student, lecturer, sync)
+│   │   ├── schemas/       request/response shapes
+│   │   └── services/      sync_service.py — the Sync Service Broker
+│   └── tests/             backend tests (pytest)
 └── docs/
     ├── API_CONTRACT.md       the agreed API between the app and the backend
     └── folder-ownership.md   who works in which file
@@ -38,27 +44,43 @@ student_portal/
 ## You need
 - Flutter 3.47.x with Dart 3.13.4 or newer (`flutter --version`; run `flutter upgrade` if older)
 - An Android phone with USB debugging on
-- Python 3.12 for the backend
+- Python 3.12 for the backend (not 3.14)
+- Windows: Developer Mode on (Settings → System → For developers)
 
-## Run the app
-1. `flutter pub get`
-2. Plug in your phone, then `flutter run`
+## Set up the backend (once)
+From the `backend` folder:
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m app.seed
+```
+The seed creates a login for every group member (their student number,
+password `Test@123`) and a lecturer (`lecturer@test.local`, password
+`Test@123`). To start again with fresh data: stop the backend, delete
+`backend\student_portal.db` and run the seed again.
 
 ## Run the backend
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+From the `backend` folder (leave the window open):
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
-Runs at `http://127.0.0.1:8000` (interactive docs at `/docs`). Routers are
-currently stubs (raise `NotImplementedError`) until each owner fills theirs
-in per `docs/folder-ownership.md` — the app will still start and list all
-routes, so you can build against it incrementally.
+Runs at `http://127.0.0.1:8000`; interactive docs at `/docs`.
+Run the tests with `.\.venv\Scripts\python.exe -m pytest`.
 
-## Connect your phone to the backend
-With the phone plugged in and the backend running, run `adb reverse tcp:8000 tcp:8000`. Repeat it every time you re-plug the phone. The app then reaches the backend at `http://127.0.0.1:8000`.
+## Run the app on your phone
+From the project folder, with the backend running and the phone plugged in:
+```powershell
+& "$env:LOCALAPPDATA\Android\sdk\platform-tools\adb.exe" reverse tcp:8000 tcp:8000
+flutter run
+```
+Repeat the `adb reverse` line every time you re-plug the phone. Log in with
+your student number and `Test@123`.
+
+## Demo: offline submission and a conflict
+1. In the app: airplane mode **on** → Assignments → submit an assignment → it shows "Queued offline" and is listed in Sync Status.
+2. In `/docs` as the lecturer: `POST /lecturer/login`, click **Authorize** and paste the token, `GET /lecturer/submissions` to find that submission, then `PUT /lecturer/submissions/{id}` with `{"status": "not_submitted"}`.
+3. In the app: airplane mode **off** → the app syncs by itself → open Sync Status and tap **Sync Now** → the "Conflict Resolved" pop-up shows the lecturer's newer change won.
+4. Without step 2 the submission simply syncs and shows as "Submitted".
 
 ## How we work
 1. `git checkout main`, then `git pull`

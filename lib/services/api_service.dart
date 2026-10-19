@@ -1,6 +1,11 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
+import 'auth_service.dart';
+
+/// Thrown when the backend can't be reached or answers with an error.
+/// [message] is safe to show to the student.
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode});
 
@@ -11,6 +16,9 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// Calls the FastAPI backend's sync endpoints (docs/API_CONTRACT.md).
+/// Every request carries the student's login token, because the backend
+/// only answers logged-in students, and only about their own data.
 class ApiService {
   ApiService._internal();
   static final ApiService instance = ApiService._internal();
@@ -26,55 +34,44 @@ class ApiService {
   static const Duration _timeout = Duration(seconds: 10);
   final http.Client _client = http.Client();
 
-  /// POST /auth/login (FR1).
-  Future<Map<String, dynamic>> login(String studentNumber, String password) async =>
-      Map<String, dynamic>.from(await _post('/auth/login', {
-        'student_number': studentNumber,
-        'password': password,
-      }) as Map);
-
-  /// GET /timetable/{student_id}
-  Future<List<dynamic>> getTimetable(int studentId) async =>
-      await _get('/timetable/$studentId') as List<dynamic>;
-
-  /// GET /announcements
-  Future<List<dynamic>> getAnnouncements() async =>
-      await _get('/announcements') as List<dynamic>;
-
-  /// GET /grades/{student_id}
-  Future<List<dynamic>> getGrades(int studentId) async =>
-      await _get('/grades/$studentId') as List<dynamic>;
-
-  /// GET /assignments/{student_id}
-  Future<List<dynamic>> getAssignments(int studentId) async =>
-      await _get('/assignments/$studentId') as List<dynamic>;
-
-  /// GET /course-materials/{module_code}
-  Future<List<dynamic>> getCourseMaterials(String moduleCode) async =>
-      await _get('/course-materials/${Uri.encodeComponent(moduleCode)}') as List<dynamic>;
-
   /// POST /sync/push: sends offline changes, returns {"status", "conflicts"}.
   Future<Map<String, dynamic>> pushChanges(List<Map<String, dynamic>> changes) async =>
       Map<String, dynamic>.from(await _post('/sync/push', changes) as Map);
 
-
+  /// GET /sync/pull/{student_id}: the student's latest data from the server.
   Future<Map<String, dynamic>> pullChanges(int studentId) async =>
       Map<String, dynamic>.from(await _get('/sync/pull/$studentId') as Map);
 
-  Future<dynamic> _get(String path) =>
-      _send(() => _client.get(Uri.parse('$baseUrl$path')));
+  Future<dynamic> _get(String path) async {
+    final headers = await AuthService.authHeaders();
+    return _send(() => _client.get(Uri.parse('$baseUrl$path'), headers: headers));
+  }
 
-  Future<dynamic> _post(String path, Object body) => _send(() => _client.post(
-        Uri.parse('$baseUrl$path'),
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ));
+  Future<dynamic> _post(String path, Object body) async {
+    final headers = await AuthService.authHeaders();
+    return _send(() => _client.post(
+          Uri.parse('$baseUrl$path'),
+          headers: headers,
+          body: jsonEncode(body),
+        ));
+  }
 
+  /// Sends a request, decodes the JSON reply, and turns every failure
+  /// (no connection, timeout, error status) into an [ApiException].
+  /// A 401 means the login expired: the saved login is cleared, so the
+  /// app opens on the Login screen next time.
   Future<dynamic> _send(Future<http.Response> Function() request) async {
     try {
       final response = await request().timeout(_timeout);
       final body = response.body.isEmpty ? null : jsonDecode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) return body;
+      if (response.statusCode == 401) {
+        await AuthService.handleUnauthorized();
+        throw ApiException(
+          'Your login has expired – please log out and log in again.',
+          statusCode: 401,
+        );
+      }
       final detail = body is Map && body['detail'] != null
           ? body['detail'].toString()
           : 'Server error (${response.statusCode})';

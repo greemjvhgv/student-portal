@@ -1,17 +1,30 @@
 """
 Owner: Ruan (backend project structure + authentication).
 
-App entry point. TODO once each router below actually exists (right now
-they're stubs that raise NotImplementedError when called, but they DO
-import cleanly, so this file runs as-is):
-  - confirm CORS settings are right for the Flutter app's requests
-  - decide whether to keep Base.metadata.create_all() for dev, or move to
-    a real migration tool before this goes further
+App entry point: creates the database tables, enables CORS for local
+development and registers the routers.
+
+Access rules:
+  - /auth/login and /lecturer/login are open.
+  - Every student router requires a student login token, and a
+    {student_id} in the URL must be the student's own id
+    (app/api/access.py).
+  - /lecturer/* routes require a lecturer token (app/routers/lecturer.py).
 """
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.access import require_student_access
 from app.database import Base, engine
-from app.routers import auth, timetable, announcements, grades, assignments, course_materials, sync
+from app.routers import (
+    announcements,
+    assignments,
+    auth,
+    course_materials,
+    grades,
+    lecturer,
+    sync,
+    timetable,
+)
 
 Base.metadata.create_all(bind=engine)
 
@@ -38,10 +51,15 @@ def root():
     return {"status": "ok", "service": "student-portal-api"}
 
 
+# Open: logging in.
 app.include_router(auth.router)
-app.include_router(timetable.router)
-app.include_router(announcements.router)
-app.include_router(grades.router)
-app.include_router(assignments.router)
-app.include_router(course_materials.router)
-app.include_router(sync.router)
+app.include_router(lecturer.router)
+
+# Students only, and only their own data.
+_student_only = [Depends(require_student_access)]
+app.include_router(timetable.router, dependencies=_student_only)
+app.include_router(announcements.router, dependencies=_student_only)
+app.include_router(grades.router, dependencies=_student_only)
+app.include_router(assignments.router, dependencies=_student_only)
+app.include_router(course_materials.router, dependencies=_student_only)
+app.include_router(sync.router, dependencies=_student_only)
