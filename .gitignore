@@ -63,4 +63,28 @@ backend/student_portal.db
 __pycache__/
 *.db
 .env
+# Python backend - local development files
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.db
+backend/*.sqlite3
+backend/uploads/
+backend/.env
+
+# Shared Python development exclusions
+backend/student_portal.db
+.venv/
+__pycache__/
+*.db
+.env
 .pytest_cache/
+
+# Android-only Flutter project
+# Other platform folders are not required
+/ios/
+/linux/
+/macos/
+/windows/
+/web/

@@ -2,6 +2,8 @@
 Owner: Ofentse (backend: sync service + conflict resolution).
 
 POST /sync/push and GET /sync/pull/{student_id}.
+Both need a student login token (see app/main.py). The push applies each
+change to the logged-in student's own records only.
 """
 
 from datetime import datetime
@@ -10,7 +12,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_student
 from app.database import get_db
+from app.models.student import Student
 from app.services.sync_service import apply_push, pull_changes_since
 
 router = APIRouter(prefix="/sync", tags=["sync"])
@@ -27,6 +31,7 @@ class SyncPushItem(BaseModel):
 def sync_push(
     changes: list[SyncPushItem],
     db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
 ):
     conflicts = []
 
@@ -34,6 +39,7 @@ def sync_push(
         for change in changes:
             conflict = apply_push(
                 db=db,
+                student_id=student.student_id,
                 table_name=change.table,
                 record_id=change.id,
                 fields={"status": change.status},
