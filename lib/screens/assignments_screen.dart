@@ -1,23 +1,114 @@
 import 'package:flutter/material.dart';
+import '../models/assignment.dart';
+import '../services/local_db_service.dart';
+import '../utils/time_format.dart';
+import '../widgets/portal_app_bar.dart';
+import 'submit_assignment_screen.dart';
 
-/// Matches the Assignment Submission wireframe (D3 Figure 7): offline
-/// warning banner, assignment header, attachment drop zone, notes field,
-/// submit button, "Pending in local queue" list.
-///
-/// Owner: Annuschka (you). Follow login_screen.dart's shape. TODO:
-///   - if offline, save the submission locally via LocalDbService with
-///     status "queued" (US05) instead of calling the API directly
-///   - SyncService picks up queued submissions and POSTs
-///     /assignments/{id}/submit once connectivity returns
-class AssignmentsScreen extends StatelessWidget {
+class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({super.key});
+
+  @override
+  State<AssignmentsScreen> createState() => _AssignmentsScreenState();
+}
+
+class _AssignmentsScreenState extends State<AssignmentsScreen> {
+  static const _navy = PortalAppBar.navy;
+
+  Future<List<Assignment>> _assignmentsFuture =
+      LocalDbService.instance.getAssignments();
+
+  Future<void> _open(Assignment assignment) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => SubmitAssignmentScreen(assignment: assignment),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _assignmentsFuture = LocalDbService.instance.getAssignments();
+    });
+  }
+
+  Widget _statusChip(String status) {
+    final (label, color) = switch (status) {
+      'submitted' => ('Submitted', const Color(0xFF2E7D32)),
+      'queued' => ('Queued offline', const Color(0xFFB26A00)),
+      _ => ('Not submitted', const Color(0xFFD32F2F)),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color),
+      ),
+      child: Text(label, style: TextStyle(color: color, fontSize: 13)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Assignments')),
-      body: const Center(
-        child: Text('TODO: assignment list + submission flow'),
+      backgroundColor: Colors.white,
+      appBar: const PortalAppBar(title: 'Assignments'),
+      body: SafeArea(
+        child: FutureBuilder<List<Assignment>>(
+          future: _assignmentsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return const Center(
+                child: Text('Could not load assignments from this device.'),
+              );
+            }
+            final assignments = snapshot.data!;
+            if (assignments.isEmpty) {
+              return const Center(child: Text('No assignments yet.'));
+            }
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                for (final assignment in assignments)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      title: Text(
+                        assignment.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _navy,
+                        ),
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              assignment.dueDate == null
+                                  ? assignment.moduleCode
+                                  : '${assignment.moduleCode} \u2022 Due ${formatDue(assignment.dueDate!)}',
+                            ),
+                            const SizedBox(height: 6),
+                            _statusChip(assignment.status),
+                          ],
+                        ),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _open(assignment),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

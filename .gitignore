@@ -56,3 +56,11 @@ backend/*.db
 backend/*.sqlite3
 backend/uploads/
 backend/.env
+
+# Shared Python development exclusions
+backend/student_portal.db
+.venv/
+__pycache__/
+*.db
+.env
+.pytest_cache/
