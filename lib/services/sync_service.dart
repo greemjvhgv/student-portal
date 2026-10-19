@@ -82,13 +82,20 @@ class SyncService {
               },
           ]);
           contacted = true;
-          final conflictIds = {
-            for (final c in response['conflicts'] as List? ?? const []) (c as Map)['id'],
+          // Conflicts reported by the server, by record id (server wins).
+          final serverConflicts = {
+            for (final c in response['conflicts'] as List? ?? const [])
+              (c as Map)['id']: c,
           };
           for (final change in pushable) {
-            if (conflictIds.contains(change.entityId)) {
+            final serverConflict = serverConflicts[change.entityId];
+            if (serverConflict != null) {
               await db.markChangeConflict(change.syncId);
-              conflicts.add({'id': change.entityId, 'label': change.label});
+              conflicts.add({
+                'id': change.entityId,
+                'label': change.label,
+                'server_updated_at': serverConflict['server_updated_at'],
+              });
             } else {
               await db.markChangeSynced(change.syncId);
               await db.setAssignmentStatus(change.entityId, 'submitted');

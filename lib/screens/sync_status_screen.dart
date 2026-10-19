@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/pending_change.dart';
 import '../services/connectivity_service.dart';
 import '../services/local_db_service.dart';
@@ -7,6 +8,11 @@ import '../utils/time_format.dart';
 import '../widgets/portal_app_bar.dart';
 import 'conflict_resolution_screen.dart';
 
+/// Sync Status (D3 Figure 6, US11): live connection card, the real offline
+/// queue from the local database ("Pending items"), recently synced items,
+/// and a manual "Sync Now" (FR14). Refreshes after every sync, and shows
+/// the "Conflict Resolved" pop-up (Figure 8) when the server's newer
+/// version wins (FR12).
 class SyncStatusScreen extends StatefulWidget {
   const SyncStatusScreen({super.key});
 
@@ -44,19 +50,25 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
     _syncedFuture = LocalDbService.instance.getRecentlySynced();
   }
 
+  /// Reloads the lists whenever a sync finishes or the queue changes.
   void _onSyncChanged() {
     if (mounted) setState(_loadQueue);
   }
 
+  /// Manual sync (US11): explains when offline, shows conflicts (Fig 8)
+  /// and a short summary otherwise.
   Future<void> _syncNow() async {
     setState(() => _isSyncing = true);
     final result = await SyncService.instance.syncNow();
     if (!mounted) return;
     setState(() => _isSyncing = false);
     if (result.conflicts.isNotEmpty) {
+      final conflict = result.conflicts.first;
+      final serverTime = DateTime.tryParse('${conflict['server_updated_at']}');
       await showConflictResolvedDialog(
         context,
-        recordName: result.conflicts.first['label'] as String,
+        recordName: conflict['label'] as String,
+        serverUpdateTime: serverTime == null ? null : clockTime(serverTime),
       );
       return;
     }

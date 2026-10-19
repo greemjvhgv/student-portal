@@ -54,3 +54,10 @@ __pycache__/
 *.db
 .env
 .pytest_cache/
+
+# This app targets Android only (D3); Flutter regenerates these when run
+/ios/
+/linux/
+/macos/
+/windows/
+/web/

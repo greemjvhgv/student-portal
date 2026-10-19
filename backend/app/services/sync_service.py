@@ -8,6 +8,8 @@ server-wins conflict resolution, and student sync pulls.
 import json
 from datetime import datetime, timezone
 
+from sqlalchemy import select
+
 from app.models.assignment import Assignment
 from app.models.announcement import Announcement
 from app.models.conflict import Conflict
@@ -36,13 +38,29 @@ def _json(data):
     return json.dumps(data, default=str)
 
 
-def apply_push(db, table_name: str, record_id: int, fields: dict, client_updated_at):
+def apply_push(
+    db,
+    student_id: int,
+    table_name: str,
+    record_id: int,
+    fields: dict,
+    client_updated_at,
+):
     """
-    Apply one offline change.
+    Apply one offline change made by the logged-in student.
 
-    The agreed contract currently supports assignment status changes.
-    A submission is updated only if exactly one submission exists for
-    the assignment, because the payload does not identify a student.
+    Supports assignment status changes (US05). The change is applied to
+    this student's own Submission for the assignment (student_id comes from
+    the login token, see app/routers/sync.py).
+
+    Conflict rule (FR11-FR13, US06): if the server's copy of the submission
+    changed after the student made the change offline, the server wins:
+    nothing is applied, both sides are saved in Conflict, and the conflict
+    is returned to the app.
+
+    Pushing the same change again (e.g. the reply was lost when the
+    connection dropped and the phone retried) is ignored, so retries never
+    create duplicates or false conflicts (D3 Reliability).
     """
 
     if table_name != "assignments":
@@ -70,51 +88,49 @@ def apply_push(db, table_name: str, record_id: int, fields: dict, client_updated
     if assignment is None:
         raise ValueError("Assignment not found.")
 
-    submissions = (
+    submission = (
         db.query(Submission)
-        .filter(Submission.assignment_id == record_id)
-        .all()
-    )
-
-    # Never guess which student's submission should be changed.
-    if len(submissions) != 1:
-        raise ValueError(
-            "Cannot safely identify the student's submission. "
-            "The agreed payload does not include student_id."
-        )
-
-    submission = submissions[0]
-
-    metadata = (
-        db.query(SyncMetadata)
         .filter(
-            SyncMetadata.entity_type == table_name,
-            SyncMetadata.entity_id == record_id,
+            Submission.assignment_id == record_id,
+            Submission.student_id == student_id,
         )
         .first()
     )
 
-    # Prefer sync metadata; fall back to the existing server record.
-    server_updated_at = (
-        metadata.last_modified_at if metadata else None
-    )
-
-    if server_updated_at is None:
-        server_updated_at = submission.updated_at
-
-    if server_updated_at is None:
-        server_updated_at = assignment.updated_at
+    if submission is None:
+        raise ValueError("No submission record for this student and assignment.")
 
     client_time = _as_utc(client_updated_at)
-    server_time = _as_utc(server_updated_at)
+    server_time = _as_utc(submission.updated_at)
+
+    # Same change already applied earlier: nothing to do.
+    if (
+        status == "submitted"
+        and submission.status == "submitted"
+        and _as_utc(submission.submitted_at) == client_time
+    ):
+        return None
+
+    entity_type = "submissions"
+    entity_id = str(submission.submission_id)
+
+    metadata = (
+        db.query(SyncMetadata)
+        .filter(
+            SyncMetadata.entity_type == entity_type,
+            SyncMetadata.entity_id == entity_id,
+        )
+        .first()
+    )
 
     operation = SyncOperation(
-        entity_type=table_name,
-        entity_id=record_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
         operation_type="push",
         payload=_json({
             "table": table_name,
             "id": record_id,
+            "student_id": student_id,
             **fields,
             "client_updated_at": client_updated_at,
         }),
@@ -125,21 +141,21 @@ def apply_push(db, table_name: str, record_id: int, fields: dict, client_updated
 
     # A newer server version wins; preserve it and log the conflict.
     if server_time is not None and server_time > client_time:
-        conflict = Conflict(
-            entity_type=table_name,
-            entity_id=record_id,
+        db.add(Conflict(
+            entity_type=entity_type,
+            entity_id=entity_id,
             local_version=metadata.local_version if metadata else None,
             server_version=metadata.server_version if metadata else None,
-            local_data=_json(fields),
+            local_data=_json({**fields, "client_updated_at": client_updated_at}),
             server_data=_json({
                 "assignment_id": assignment.assignment_id,
                 "submission_id": submission.submission_id,
                 "status": submission.status,
-                "updated_at": server_updated_at,
+                "updated_at": server_time,
             }),
             resolution_status="server_wins",
-        )
-        db.add(conflict)
+            resolved_at=datetime.now(timezone.utc),
+        ))
 
         operation.status = "conflict"
 
@@ -147,6 +163,8 @@ def apply_push(db, table_name: str, record_id: int, fields: dict, client_updated
             "table": table_name,
             "id": record_id,
             "resolution": "server_wins",
+            "server_status": submission.status,
+            "server_updated_at": server_time.isoformat(),
         }
 
     # Apply only the permitted student submission status field.
@@ -159,8 +177,8 @@ def apply_push(db, table_name: str, record_id: int, fields: dict, client_updated
 
     if metadata is None:
         metadata = SyncMetadata(
-            entity_type=table_name,
-            entity_id=record_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
             local_version=1,
             server_version=1,
         )
@@ -175,7 +193,6 @@ def apply_push(db, table_name: str, record_id: int, fields: dict, client_updated
     operation.status = "applied"
 
     return None
-
 
 def pull_changes_since(db, student_id: int):
     """
@@ -270,11 +287,7 @@ def pull_changes_since(db, student_id: int):
     ]
 
     # Include global announcements and announcements for enrolled courses.
-    enrolled_course_ids = (
-        db.query(Enrolment.course_id)
-        .filter(Enrolment.student_id == student_id)
-        .subquery()
-    )
+    enrolled_course_ids = select(Enrolment.course_id).where(Enrolment.student_id == student_id)
 
     announcement_rows = (
         db.query(Announcement)
