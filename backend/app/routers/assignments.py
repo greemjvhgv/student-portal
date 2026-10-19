@@ -5,7 +5,7 @@ GET /assignments/{student_id} returns assignments for a student.
 POST /assignments/{id}/submit updates the student's submission status.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
@@ -14,6 +14,17 @@ from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.course import Course
 
+from app.api.deps import get_current_student
+
+from app.services.submission_files import (
+    save_submission_file,
+    delete_submission_file,
+)
+
+from app.services.submission_service import (
+    replace_submission_file,
+    delete_student_submission,
+)
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
@@ -85,4 +96,32 @@ def submit_assignment(
         "assignment_id": assignment_id
     }
 
-    
+@router.put("/submissions/{submission_id}")
+async def update_submission(
+    submission_id: int,
+    file: UploadFile = File(...),
+    student=Depends(get_current_student),
+    db: Session = Depends(get_db)
+):
+    """Update a submission belonging to the authenticated student."""
+
+    return await replace_submission_file(
+        submission_id=submission_id,
+        student_id=student.student_id,
+        file=file,
+        db=db,
+    )
+
+@router.delete("/submissions/{submission_id}")
+def delete_submission(
+    submission_id: int,
+    student=Depends(get_current_student),
+    db: Session = Depends(get_db)
+):
+    """Delete a submission belonging to the authenticated student."""
+
+    return delete_student_submission(
+        submission_id=submission_id,
+        student_id=student.student_id,
+        db=db,
+    )

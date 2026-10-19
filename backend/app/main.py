@@ -20,6 +20,7 @@ from app.routers import (
     assignments,
     auth,
     course_materials,
+    grade_queries,
     grades,
     lecturer,
     sync,
@@ -63,3 +64,4 @@ app.include_router(grades.router, dependencies=_student_only)
 app.include_router(assignments.router, dependencies=_student_only)
 app.include_router(course_materials.router, dependencies=_student_only)
 app.include_router(sync.router, dependencies=_student_only)
+app.include_router(grade_queries.router, dependencies=_student_only)
