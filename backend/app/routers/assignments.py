@@ -14,12 +14,17 @@ from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.course import Course
 
-from app.api.deps import require_authenticated_student
+from app.api.deps import get_current_student
+
 from app.services.submission_files import (
     save_submission_file,
     delete_submission_file,
 )
 
+from app.services.submission_service import (
+    replace_submission_file,
+    delete_student_submission,
+)
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
@@ -95,35 +100,28 @@ def submit_assignment(
 async def update_submission(
     submission_id: int,
     file: UploadFile = File(...),
-    student=Depends(require_authenticated_student),
+    student=Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
-    """
-    Update an existing submission.
+    """Update a submission belonging to the authenticated student."""
 
-    Access is temporarily blocked until student
-    authentication and ownership verification
-    are implemented.
-    """
-    raise HTTPException(
-        status_code=503,
-        detail="Submission updates require authentication."
+    return await replace_submission_file(
+        submission_id=submission_id,
+        student_id=student.student_id,
+        file=file,
+        db=db,
     )
 
 @router.delete("/submissions/{submission_id}")
 def delete_submission(
     submission_id: int,
-    student=Depends(require_authenticated_student),
+    student=Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
-    """
-    Delete a student submission.
+    """Delete a submission belonging to the authenticated student."""
 
-    Access remains blocked until authentication
-    and student ownership verification are available.
-    """
-    raise HTTPException(
-        status_code=503,
-        detail="Submission deletion requires authentication."
+    return delete_student_submission(
+        submission_id=submission_id,
+        student_id=student.student_id,
+        db=db,
     )
-    

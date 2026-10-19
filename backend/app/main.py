@@ -11,7 +11,7 @@ import cleanly, so this file runs as-is):
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
-from app.routers import auth, timetable, announcements, grades, assignments, course_materials, sync
+from app.routers import auth, timetable, announcements, grades, assignments, course_materials, sync, grade_queries
 
 Base.metadata.create_all(bind=engine)
 
@@ -45,3 +45,4 @@ app.include_router(grades.router)
 app.include_router(assignments.router)
 app.include_router(course_materials.router)
 app.include_router(sync.router)
+app.include_router(grade_queries.router)

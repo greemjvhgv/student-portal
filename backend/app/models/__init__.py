@@ -7,6 +7,7 @@ from .enrolment import Enrolment
 from .assignment import Assignment
 from .submission import Submission
 from .grade import Grade
+from .grade_query import GradeQuery
 from .timetable import Timetable
 from .announcement import Announcement
 from .course_material import CourseMaterial
@@ -16,6 +17,6 @@ from .conflict import Conflict
 
 __all__ = [
     "Role", "User", "Student", "LecturerAdmin", "Course", "Enrolment",
-    "Assignment", "Submission", "Grade", "Timetable", "Announcement",
+    "Assignment", "Submission", "Grade", "GradeQuery", "Timetable", "Announcement",
     "CourseMaterial", "SyncOperation", "SyncMetadata", "Conflict",
 ]
