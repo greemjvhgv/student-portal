@@ -1,3 +1,7 @@
+/// One grade, as returned by GET /sync/pull (docs/API_CONTRACT.md) and
+/// stored in the phone's local `grades` table. [id] is the server's
+/// grade_id (needed to flag a grade query); [mark] is null while the
+/// module is still "Pending".
 class Grade {
   final int? id;
   final String moduleCode;

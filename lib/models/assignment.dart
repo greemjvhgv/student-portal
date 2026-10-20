@@ -1,3 +1,9 @@
+/// One assignment and this student's submission status, as returned by
+/// GET /assignments/{student_id} and GET /sync/pull (docs/API_CONTRACT.md)
+/// and stored in the phone's local `assignments` table.
+/// [status] (US05): not_submitted / queued (waiting to sync) / submitted.
+/// [submissionId] is the student's own Submission on the server, needed to
+/// replace the file or withdraw it; null until the data has been synced.
 class Assignment {
   final int id;
   final String moduleCode;

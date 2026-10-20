@@ -9,6 +9,10 @@ import 'submit_assignment_screen.dart';
 /// Owner: Annuschka. The student's assignments with their status (US05):
 /// not submitted, queued (waiting to sync) or submitted. Read from the
 /// local database, so it works offline
+/// Owner: Annuschka. The student's assignments with their status (US05):
+/// not submitted, queued (waiting to sync) or submitted. Read from the
+/// local database, so it works offline; tapping one opens the Submit
+/// Assignment screen.
 class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({super.key});
 

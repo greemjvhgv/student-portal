@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/announcement.dart';
 import '../models/timetable_entry.dart';
 import '../services/local_db_service.dart';
@@ -384,6 +385,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// Asks for confirmation, clears the saved login, and returns to Login.
   Future<void> _confirmLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -410,6 +412,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
+  // Header with logo, "Dashboard" title, live Online/Offline pill and logout.
   Widget _buildHeaderTitle(BuildContext context) {
     return Row(
       children: [
