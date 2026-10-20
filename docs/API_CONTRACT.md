@@ -36,24 +36,60 @@ GET /assignments/{student_id}
 
 POST /assignments/{id}/submit
   get:  { "status": "submitted", "assignment_id": 1 }
+  Marks the logged-in student's own submission as submitted.
+
+PUT /assignments/submissions/{submission_id}     (replace the file)
+  send: multipart form, field "file" (.pdf, .docx or .txt, max 10 MB)
+  get:  { "message": "Submission updated successfully.", "submission_id": 4,
+          "status": "submitted", "file_path": "..." }
+
+DELETE /assignments/submissions/{submission_id}  (withdraw)
+  get:  { "message": "Submission withdrawn successfully.", "submission_id": 4,
+          "status": "not_submitted" }
+  The record is kept as "not_submitted" (file removed), so the assignment
+  stays in the list and can be submitted again.
+
+POST   /grade-queries             send: { "grade_id": 3, "reason": "..." }  (reason 10–1000 chars)
+GET    /grade-queries             list your own queries, newest first
+GET    /grade-queries/{query_id}
+PUT    /grade-queries/{query_id}  send: { "reason": "..." }   (only while "pending", else 409)
+DELETE /grade-queries/{query_id}                              (only while "pending", else 409)
+  a query: { "query_id": 1, "grade_id": 3, "reason": "...", "status": "pending" }
 
 GET /course-materials/{module_code}
   get:  [ { "title": "Week 5 Study Guide", "file_url": "..." } ]
 
 POST /sync/push        (offline changes go up)
   send: [ { "table": "assignments", "id": 1, "status": "submitted",
+            "client_updated_at": "2026-10-05T14:30:00Z" },
+          { "table": "grade_queries", "id": 3, "status": "pending",
+            "reason": "My mark for question 2 was not added.",
             "client_updated_at": "2026-10-05T14:30:00Z" } ]
   get:  { "status": "synced", "conflicts": [] }
-  Each change is applied to the logged-in student's own submission
+  assignments: id = assignment_id. grade_queries: id = grade_id.
+  Each change is applied to the logged-in student's own records
   (the student comes from the token, so no student_id in the body).
+  An invalid change (e.g. someone else's grade) rejects the push with 400.
   A conflict looks like:
         { "table": "assignments", "id": 1, "resolution": "server_wins",
           "server_status": "not_submitted",
           "server_updated_at": "2026-10-05T14:31:00+00:00" }
+  For a grade query the conflict means the lecturer changed that grade
+  after the query was written offline (Fig 8): the query is not created
+  and "server_status" is the new mark, e.g. "mark 90".
 
 GET /sync/pull/{student_id}   (changes come down)
-  get:  { "assignments": [...], "grades": [...], "timetable": [...],
-          "announcements": [...] }  – same shapes as the endpoints above
+  get:  { "assignments":   [ { ...as above, "submission_id": 4 } ],
+          "grades":        [ { "id": 3, "module_code": "ITMDA3-34",
+                               "module_name": "<course name> – Deliverable 4",
+                               "mark": 78, "updated_at": "..." } ],
+          "timetable":     [ { ...as above, "venue": "Lab C303" } ],
+          "announcements": [...],
+          "grade_queries": [ { "query_id": 1, "grade_id": 3,
+                               "module_code": "ITMDA3-34",
+                               "reason": "...", "status": "pending" } ] }
+  Enrolled modules without a grade yet come as "Pending" rows
+  (no "id", "mark": null).
 ```
 
 All timestamps sent by the app are UTC with a `Z` (or `+00:00`), so the

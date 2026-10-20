@@ -204,3 +204,89 @@ def test_newer_lecturer_change_wins_conflict(client):
     conflicts = r.json()["conflicts"]
     assert len(conflicts) == 1 and conflicts[0]["resolution"] == "server_wins"
     assert submission_status(client, lecturer, "EDUV1111111") == "not_submitted"
+
+
+# ------------------------------------------------- Submissions module
+
+def test_submit_marks_only_own_submission(client):
+    ben = student_headers(client, "EDUV2222222")
+    assert client.post("/assignments/1/submit", headers=ben).status_code == 200
+    lecturer = lecturer_headers(client)
+    assert submission_status(client, lecturer, "EDUV2222222") == "submitted"
+    assert submission_status(client, lecturer, "EDUV1111111") == "not_submitted"
+
+
+def test_withdraw_keeps_assignment_and_allows_resubmit(client):
+    ann = student_headers(client)
+    assert push(client, ann, datetime.now(timezone.utc)).json()["conflicts"] == []
+    lecturer = lecturer_headers(client)
+    submission_id = next(
+        s["submission_id"] for s in client.get("/lecturer/submissions", headers=lecturer).json()
+        if s["student_number"] == "EDUV1111111"
+    )
+    withdrawn = client.delete(f"/assignments/submissions/{submission_id}", headers=ann)
+    assert withdrawn.status_code == 200 and withdrawn.json()["status"] == "not_submitted"
+    assert [a["id"] for a in client.get("/assignments/1", headers=ann).json()] == [1]
+    again = push(client, ann, datetime.now(timezone.utc))
+    assert again.status_code == 200 and again.json()["conflicts"] == []
+    assert submission_status(client, lecturer, "EDUV1111111") == "submitted"
+
+
+# ---------------------------------------------- Grade queries module
+
+def push_grade_query(client, headers, grade_id, client_time,
+                     reason="Please re-mark question 3"):
+    return client.post("/sync/push", headers=headers, json=[{
+        "table": "grade_queries", "id": grade_id, "status": "pending",
+        "reason": reason, "client_updated_at": client_time.isoformat(),
+    }])
+
+
+def test_list_grade_queries_shows_only_own(client):
+    ann = student_headers(client)
+    created = client.post("/grade-queries", headers=ann,
+                          json={"grade_id": 1, "reason": "Please re-mark question 3"})
+    assert created.status_code == 201
+    assert len(client.get("/grade-queries", headers=ann).json()) == 1
+    ben = student_headers(client, "EDUV2222222")
+    assert client.get("/grade-queries", headers=ben).json() == []
+
+
+def test_push_grade_query_creates_it_once(client):
+    ann = student_headers(client)
+    client_time = datetime.now(timezone.utc)
+    first = push_grade_query(client, ann, 1, client_time)
+    assert first.status_code == 200 and first.json()["conflicts"] == []
+    retry = push_grade_query(client, ann, 1, client_time)
+    assert retry.status_code == 200 and retry.json()["conflicts"] == []
+    assert len(client.get("/grade-queries", headers=ann).json()) == 1
+
+
+def test_push_grade_query_for_someone_elses_grade_is_rejected(client):
+    ann = student_headers(client)
+    r = push_grade_query(client, ann, 2, datetime.now(timezone.utc))
+    assert r.status_code == 400
+
+
+def test_newer_lecturer_grade_update_wins_over_offline_query(client):
+    ann = student_headers(client)
+    flagged_offline_at = datetime.now(timezone.utc)
+    lecturer = lecturer_headers(client)
+    assert client.put("/lecturer/grades/1", headers=lecturer,
+                      json={"mark": 85}).status_code == 200
+    r = push_grade_query(client, ann, 1, flagged_offline_at)
+    assert r.status_code == 200
+    conflicts = r.json()["conflicts"]
+    assert len(conflicts) == 1 and conflicts[0]["table"] == "grade_queries"
+    assert conflicts[0]["resolution"] == "server_wins"
+    assert client.get("/grade-queries", headers=ann).json() == []
+
+
+def test_pull_includes_ids_and_grade_queries(client):
+    ann = student_headers(client)
+    push_grade_query(client, ann, 1, datetime.now(timezone.utc))
+    data = client.get("/sync/pull/1", headers=ann).json()
+    assert data["assignments"][0]["submission_id"] is not None
+    assert data["grades"][0]["id"] == 1
+    assert len(data["grade_queries"]) == 1
+    assert data["grade_queries"][0]["module_code"] == "ITMDA3-34"

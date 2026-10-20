@@ -16,6 +16,7 @@ from app.models.conflict import Conflict
 from app.models.course import Course
 from app.models.enrolment import Enrolment
 from app.models.grade import Grade
+from app.models.grade_query import GradeQuery
 from app.models.submission import Submission
 from app.models.sync_metadata import SyncMetadata
 from app.models.sync_operation import SyncOperation
@@ -23,7 +24,6 @@ from app.models.timetable import Timetable
 
 
 def _as_utc(value):
-    """Normalize timestamps for safe comparison."""
     if value is None:
         return None
 
@@ -34,7 +34,6 @@ def _as_utc(value):
 
 
 def _json(data):
-    """Serialize data for the sync log and conflict records."""
     return json.dumps(data, default=str)
 
 
@@ -46,38 +45,25 @@ def apply_push(
     fields: dict,
     client_updated_at,
 ):
-    """
-    Apply one offline change made by the logged-in student.
-
-    Supports assignment status changes (US05). The change is applied to
-    this student's own Submission for the assignment (student_id comes from
-    the login token, see app/routers/sync.py).
-
-    Conflict rule (FR11-FR13, US06): if the server's copy of the submission
-    changed after the student made the change offline, the server wins:
-    nothing is applied, both sides are saved in Conflict, and the conflict
-    is returned to the app.
-
-    Pushing the same change again (e.g. the reply was lost when the
-    connection dropped and the phone retried) is ignored, so retries never
-    create duplicates or false conflicts (D3 Reliability).
-    """
-
-    if table_name != "assignments":
-        raise ValueError(
-            "Only assignment-status updates are supported by this sync endpoint."
-        )
 
     if not isinstance(fields, dict):
         raise ValueError("The change fields must be an object.")
+
+    if client_updated_at is None:
+        raise ValueError("client_updated_at is required.")
+
+    fields = {key: value for key, value in fields.items() if value is not None}
+
+    if table_name == "grade_queries":
+        return _apply_grade_query(db, student_id, record_id, fields, client_updated_at)
+
+    if table_name != "assignments":
+        raise ValueError(f"Unsupported table: {table_name}.")
 
     status = fields.get("status")
 
     if status not in {"submitted", "not_submitted"}:
         raise ValueError("Unsupported assignment status.")
-
-    if client_updated_at is None:
-        raise ValueError("client_updated_at is required.")
 
     assignment = (
         db.query(Assignment)
@@ -103,7 +89,6 @@ def apply_push(
     client_time = _as_utc(client_updated_at)
     server_time = _as_utc(submission.updated_at)
 
-    # Same change already applied earlier: nothing to do.
     if (
         status == "submitted"
         and submission.status == "submitted"
@@ -139,7 +124,6 @@ def apply_push(
     )
     db.add(operation)
 
-    # A newer server version wins; preserve it and log the conflict.
     if server_time is not None and server_time > client_time:
         db.add(Conflict(
             entity_type=entity_type,
@@ -167,7 +151,6 @@ def apply_push(
             "server_updated_at": server_time.isoformat(),
         }
 
-    # Apply only the permitted student submission status field.
     submission.status = status
 
     now = datetime.now(timezone.utc)
@@ -194,14 +177,94 @@ def apply_push(
 
     return None
 
-def pull_changes_since(db, student_id: int):
-    """
-    Return the current server snapshot for the requested student.
 
-    The existing schema does not store a per-student last-sync
-    checkpoint, so this returns the current snapshot rather than
-    claiming to return a precise incremental delta.
-    """
+def _apply_grade_query(db, student_id: int, grade_id: int, fields: dict, client_updated_at):
+
+    reason = (fields.get("reason") or "").strip()
+
+    if len(reason) < 10:
+        raise ValueError("A grade query reason needs at least 10 characters.")
+
+    grade = (
+        db.query(Grade)
+        .filter(Grade.grade_id == grade_id, Grade.student_id == student_id)
+        .first()
+    )
+
+    if grade is None:
+        raise ValueError("Grade not found for this student.")
+
+    duplicate = (
+        db.query(GradeQuery)
+        .filter(
+            GradeQuery.student_id == student_id,
+            GradeQuery.grade_id == grade_id,
+            GradeQuery.reason == reason,
+            GradeQuery.status == "pending",
+        )
+        .first()
+    )
+
+    if duplicate is not None:
+        return None
+
+    client_time = _as_utc(client_updated_at)
+    server_time = _as_utc(grade.updated_at)
+    entity_id = str(grade_id)
+
+    operation = SyncOperation(
+        entity_type="grade_queries",
+        entity_id=entity_id,
+        operation_type="push",
+        payload=_json({
+            "table": "grade_queries",
+            "grade_id": grade_id,
+            "student_id": student_id,
+            "reason": reason,
+            "client_updated_at": client_updated_at,
+        }),
+        status="pending",
+        attempts=1,
+    )
+    db.add(operation)
+
+    if server_time is not None and server_time > client_time:
+        db.add(Conflict(
+            entity_type="grades",
+            entity_id=entity_id,
+            local_data=_json({"reason": reason, "client_updated_at": client_updated_at}),
+            server_data=_json({
+                "grade_id": grade_id,
+                "mark": grade.mark,
+                "updated_at": server_time,
+            }),
+            resolution_status="server_wins",
+            resolved_at=datetime.now(timezone.utc),
+        ))
+
+        operation.status = "conflict"
+
+        return {
+            "table": "grade_queries",
+            "id": grade_id,
+            "resolution": "server_wins",
+            "server_status": f"mark {grade.mark:g}",
+            "server_updated_at": server_time.isoformat(),
+        }
+
+    db.add(GradeQuery(
+        student_id=student_id,
+        grade_id=grade_id,
+        reason=reason,
+        status="pending",
+    ))
+
+    operation.status = "applied"
+
+    return None
+
+
+def pull_changes_since(db, student_id: int):
 
     student_exists = (
         db.query(Enrolment)
@@ -210,7 +273,6 @@ def pull_changes_since(db, student_id: int):
     )
 
     if student_exists is None:
-        # A student with no enrolments may still exist.
         from app.models.student import Student
 
         if db.query(Student).filter(
@@ -236,28 +298,32 @@ def pull_changes_since(db, student_id: int):
             "title": assignment.title,
             "status": submission.status,
             "due_date": (
-                assignment.due_date.date().isoformat()
+                _as_utc(assignment.due_date).isoformat()
                 if assignment.due_date
                 else None
             ),
+            "submission_id": submission.submission_id,
         }
         for assignment, submission, course_code in assignment_rows
     ]
 
     grade_rows = (
-        db.query(Grade, Course.course_code)
+        db.query(Grade, Course.course_code, Course.course_name, Assignment.title)
         .join(
             Assignment,
             Grade.assignment_id == Assignment.assignment_id,
         )
         .join(Course, Assignment.course_id == Course.course_id)
         .filter(Grade.student_id == student_id)
+        .order_by(Course.course_code, Grade.grade_id)
         .all()
     )
 
     grades = [
         {
+            "id": grade.grade_id,
             "module_code": course_code,
+            "module_name": f"{course_name} – {title}",
             "mark": grade.mark,
             "updated_at": (
                 grade.updated_at.date().isoformat()
@@ -265,7 +331,26 @@ def pull_changes_since(db, student_id: int):
                 else None
             ),
         }
-        for grade, course_code in grade_rows
+        for grade, course_code, course_name, title in grade_rows
+    ]
+
+    graded_codes = {course_code for _, course_code, _, _ in grade_rows}
+    enrolled_courses = (
+        db.query(Course)
+        .join(Enrolment, Enrolment.course_id == Course.course_id)
+        .filter(Enrolment.student_id == student_id)
+        .order_by(Course.course_code)
+        .all()
+    )
+    grades += [
+        {
+            "module_code": course.course_code,
+            "module_name": course.course_name,
+            "mark": None,
+            "updated_at": None,
+        }
+        for course in enrolled_courses
+        if course.course_code not in graded_codes
     ]
 
     timetable_rows = (
@@ -282,11 +367,11 @@ def pull_changes_since(db, student_id: int):
             "day": item.day_of_week,
             "time": item.start_time.strftime("%H:%M"),
             "type": "Lecture",
+            "venue": item.venue,
         }
         for item, course_code in timetable_rows
     ]
 
-    # Include global announcements and announcements for enrolled courses.
     enrolled_course_ids = select(Enrolment.course_id).where(Enrolment.student_id == student_id)
 
     announcement_rows = (
@@ -311,9 +396,31 @@ def pull_changes_since(db, student_id: int):
         for item in announcement_rows
     ]
 
+    query_rows = (
+        db.query(GradeQuery, Course.course_code)
+        .join(Grade, GradeQuery.grade_id == Grade.grade_id)
+        .join(Assignment, Grade.assignment_id == Assignment.assignment_id)
+        .join(Course, Assignment.course_id == Course.course_id)
+        .filter(GradeQuery.student_id == student_id)
+        .order_by(GradeQuery.query_id.desc())
+        .all()
+    )
+
+    grade_queries = [
+        {
+            "query_id": query.query_id,
+            "grade_id": query.grade_id,
+            "module_code": course_code,
+            "reason": query.reason,
+            "status": query.status,
+        }
+        for query, course_code in query_rows
+    ]
+
     return {
         "assignments": assignments,
         "grades": grades,
         "timetable": timetable,
         "announcements": announcements,
+        "grade_queries": grade_queries,
     }

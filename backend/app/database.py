@@ -9,8 +9,6 @@ in lib/services/local_db_service.dart). The Sync Service Broker
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# SQLite file for local development; swap for a real Postgres URL in
-# production if the group wants to (not required for the prototype).
 DATABASE_URL = "sqlite:///./student_portal.db"
 
 engine = create_engine(

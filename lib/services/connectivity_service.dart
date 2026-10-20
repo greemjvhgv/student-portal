@@ -1,7 +1,13 @@
 import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
+/// Owner: Annuschka.
+///
+/// Watches the phone's connection (connectivity_plus). [isOnline] drives
+/// the offline banners, and SyncService listens to it to sync
+/// automatically when the connection returns (FR7).
 class ConnectivityService {
   ConnectivityService._internal();
   static final ConnectivityService instance = ConnectivityService._internal();

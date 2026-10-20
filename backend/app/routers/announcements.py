@@ -17,13 +17,6 @@ router = APIRouter(prefix="/announcements", tags=["announcements"])
 
 @router.get("")
 def get_announcements(db: Session = Depends(get_db)):
-    """
-    Return all announcements from the database.
-
-    The database uses 'content' and 'created_at', while the API
-    contract exposes these values as 'body' and 'posted_at'.
-    """
-
     announcements = (
         db.query(Announcement)
         .order_by(Announcement.created_at.desc())

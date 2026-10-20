@@ -7,12 +7,6 @@ portal:
   1. POST /lecturer/login with the lecturer's email and password
   2. click "Authorize" at the top of /docs and paste the token
   3. use the endpoints below.
-
-Every change updates the record's updated_at on the server, so a student's
-older offline change to the same record loses the timestamp rule on their
-next sync: the server's more recent update wins (FR12, FR13, US06).
-Lecturer tokens are separate from student tokens: their subject is
-"lecturer:<id>", which the student login check rejects.
 """
 from datetime import datetime, time, timedelta, timezone
 from typing import Literal
@@ -72,7 +66,6 @@ def get_current_lecturer(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
 ) -> LecturerAdmin:
-    """Use as Depends(get_current_lecturer) on lecturer-only routes."""
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Lecturer login required",
@@ -122,7 +115,6 @@ def lecturer_login(body: LecturerLoginRequest, db: Session = Depends(get_db)):
 
 
 def _check_own_course(course: Course | None, lecturer: LecturerAdmin) -> None:
-    """Lecturers may only change records of the courses they teach."""
     if course is None:
         raise HTTPException(status_code=404, detail="Course not found")
     if course.lecturer_id != lecturer.lecturer_id:
@@ -130,7 +122,6 @@ def _check_own_course(course: Course | None, lecturer: LecturerAdmin) -> None:
 
 
 def _iso(value: datetime | None) -> str | None:
-    """UTC timestamp with timezone, so the app reads the correct time."""
     if value is None:
         return None
     if value.tzinfo is None:
@@ -151,7 +142,7 @@ def list_grades(
     lecturer: LecturerAdmin = Depends(get_current_lecturer),
     db: Session = Depends(get_db),
 ):
-    """Grades in the lecturer's courses, to find the grade_id to update."""
+
     rows = (
         db.query(Grade, Student.student_number, Assignment.title, Course.course_code)
         .join(Student, Grade.student_id == Student.student_id)
@@ -190,6 +181,7 @@ def update_grade(
         raise HTTPException(status_code=422, detail="Nothing to update")
     for field, value in changes.items():
         setattr(grade, field, value)
+    grade.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(grade)
     return {
@@ -212,7 +204,6 @@ def list_submissions(
     lecturer: LecturerAdmin = Depends(get_current_lecturer),
     db: Session = Depends(get_db),
 ):
-    """Submissions in the lecturer's courses, to find a submission_id."""
     rows = (
         db.query(Submission, Student.student_number, Assignment.title, Course.course_code)
         .join(Student, Submission.student_id == Student.student_id)
@@ -243,14 +234,11 @@ def update_submission(
     lecturer: LecturerAdmin = Depends(get_current_lecturer),
     db: Session = Depends(get_db),
 ):
-    """E.g. reopen a submission ("not_submitted"). A student's offline
-    submission made before this change loses the conflict on sync."""
     submission = db.get(Submission, submission_id)
     if submission is None:
         raise HTTPException(status_code=404, detail="Submission not found")
     _check_own_course(submission.assignment.course, lecturer)
     submission.status = body.status
-    # Set explicitly so the change always counts as a new server version.
     submission.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(submission)
@@ -266,7 +254,7 @@ def update_submission(
 class AnnouncementCreate(BaseModel):
     title: str = Field(min_length=1)
     content: str = Field(min_length=1)
-    course_id: int | None = None  # empty = for all students
+    course_id: int | None = None
 
 
 class AnnouncementUpdate(BaseModel):

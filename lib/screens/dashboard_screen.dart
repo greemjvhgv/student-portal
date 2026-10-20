@@ -8,6 +8,9 @@ import 'timetable_screen.dart';
 import '../services/connectivity_service.dart';
 import '../services/auth_service.dart';
 
+/// Owner: Charleen. The home screen (D3 Dashboard wireframe): today's
+/// timetable and the latest announcements from the local database, the
+/// online/offline status, and navigation to the other screens.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -17,17 +20,26 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   static const _weekdays = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
-  final Future<List<TimetableEntry>> _todayFuture =
-      LocalDbService.instance.getTimetable().then((entries) {
-    final today = _weekdays[DateTime.now().weekday - 1];
-    return entries.where((entry) => entry.day == today).toList();
-  });
+  final Future<List<TimetableEntry>> _todayFuture = LocalDbService.instance
+      .getTimetable()
+      .then((entries) {
+        final today = _weekdays[DateTime.now().weekday - 1];
+        return entries.where((entry) => entry.day == today).toList();
+      });
 
-  final Future<List<Announcement>> _announcementsFuture =
-      LocalDbService.instance.getAnnouncements().then((list) => list.take(3).toList());
+  final Future<List<Announcement>> _announcementsFuture = LocalDbService
+      .instance
+      .getAnnouncements()
+      .then((list) => list.take(3).toList());
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +63,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -79,9 +94,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildActionButton(context, label: 'My Grades', route: '/grades', bgColor: buttonBgColor, borderColor: buttonBorderColor, textColor: buttonTextColor),
+                    _buildActionButton(
+                      context,
+                      label: 'My Grades',
+                      route: '/grades',
+                      bgColor: buttonBgColor,
+                      borderColor: buttonBorderColor,
+                      textColor: buttonTextColor,
+                    ),
                     const SizedBox(height: 14),
-                    _buildActionButton(context, label: 'My Course Materials', route: '/course-materials', bgColor: buttonBgColor, borderColor: buttonBorderColor, textColor: buttonTextColor),
+                    _buildActionButton(
+                      context,
+                      label: 'My Course Materials',
+                      route: '/course-materials',
+                      bgColor: buttonBgColor,
+                      borderColor: buttonBorderColor,
+                      textColor: buttonTextColor,
+                    ),
                   ],
                 ),
               ),
@@ -101,9 +130,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildNavItem(context, label: 'Home', isSelected: true, onTap: () {}),
-          _buildNavItem(context, label: 'Grades', isSelected: false, onTap: () => Navigator.pushNamed(context, '/grades')),
-          _buildNavItem(context, label: 'Assignments', isSelected: false, onTap: () => Navigator.pushNamed(context, '/assignments')),
-          _buildNavItem(context, label: 'Sync', isSelected: false, onTap: () => Navigator.pushNamed(context, '/sync-status')),
+          _buildNavItem(
+            context,
+            label: 'Grades',
+            isSelected: false,
+            onTap: () => Navigator.pushNamed(context, '/grades'),
+          ),
+          _buildNavItem(
+            context,
+            label: 'Assignments',
+            isSelected: false,
+            onTap: () => Navigator.pushNamed(context, '/assignments'),
+          ),
+          _buildNavItem(
+            context,
+            label: 'Sync',
+            isSelected: false,
+            onTap: () => Navigator.pushNamed(context, '/sync-status'),
+          ),
         ],
       ),
     );
@@ -152,7 +196,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Center(
           child: Text(
             label,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
           ),
         ),
       ),
@@ -162,7 +210,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _cardMessage(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Text(text, style: const TextStyle(fontSize: 15, color: Colors.grey)),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 15, color: Colors.grey),
+      ),
     );
   }
 
@@ -176,7 +227,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const AnnouncementsScreen()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AnnouncementsScreen()),
+        );
       },
       child: Container(
         decoration: BoxDecoration(
@@ -194,7 +248,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Text(
                     'Announcements',
-                    style: TextStyle(color: navyColor, fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(
+                      color: navyColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
                 Expanded(child: Divider(color: cardBorderColor, thickness: 1)),
@@ -209,20 +267,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => AnnouncementDetailScreen(announcement: announcement),
+                      builder: (context) =>
+                          AnnouncementDetailScreen(announcement: announcement),
                     ),
                   );
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3.0, horizontal: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 3.0,
+                    horizontal: 8.0,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('\u2022 ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      const Text(
+                        '\u2022 ',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
                       Expanded(
                         child: Text(
                           announcement.title,
-                          style: const TextStyle(fontSize: 15, color: Colors.black87),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
                     ],
@@ -233,7 +305,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 12),
             Divider(color: cardBorderColor, height: 1),
             const SizedBox(height: 6),
-            const Text('cached locally - visible offline', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            const Text(
+              'cached locally - visible offline',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
           ],
         ),
       ),
@@ -250,7 +325,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const TimetableScreen()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const TimetableScreen()),
+        );
       },
       child: Container(
         decoration: BoxDecoration(
@@ -268,7 +346,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Text(
                     "Today's Timetable",
-                    style: TextStyle(color: navyColor, fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(
+                      color: navyColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
                 Expanded(child: Divider(color: cardBorderColor, thickness: 1)),
@@ -279,27 +361,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _cardMessage(isLoading ? 'Loading…' : 'No classes today'),
             ...entries.map(
               (entry) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-                child: Text('${entry.time} ${entry.moduleCode}', style: const TextStyle(fontSize: 15, color: Colors.black87)),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 4.0,
+                  horizontal: 8.0,
+                ),
+                child: Text(
+                  '${entry.time} ${entry.moduleCode}',
+                  style: const TextStyle(fontSize: 15, color: Colors.black87),
+                ),
               ),
             ),
             const SizedBox(height: 12),
             Divider(color: cardBorderColor, height: 1),
             const SizedBox(height: 6),
-            const Text('cached locally - visible offline', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            const Text(
+              'cached locally - visible offline',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// Asks for confirmation, clears the saved login, and returns to Login.
   Future<void> _confirmLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Log out?'),
-        content: const Text('You will need an internet connection to log in again.'),
+        content: const Text(
+          'You will need an internet connection to log in again.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -318,7 +410,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
-  // Header with logo, "Dashboard" title, live Online/Offline pill and logout.
   Widget _buildHeaderTitle(BuildContext context) {
     return Row(
       children: [
@@ -335,7 +426,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(width: 12),
         const Text(
           'Dashboard',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
         ),
         const Spacer(),
         ValueListenableBuilder<bool>(
@@ -347,14 +442,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: 14,
                 height: 14,
                 decoration: BoxDecoration(
-                  color: isOnline ? const Color(0xFF4CD964) : const Color(0xFFFF5252),
+                  color: isOnline
+                      ? const Color(0xFF4CD964)
+                      : const Color(0xFFFF5252),
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
                 isOnline ? 'Online' : 'Offline',
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),

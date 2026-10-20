@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/announcement.dart';
 import '../services/local_db_service.dart';
 import 'announcement_detail_screen.dart';
@@ -12,15 +13,14 @@ class AnnouncementsScreen extends StatefulWidget {
 }
 
 class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
-  final Future<List<Announcement>> _announcementsFuture =
-      LocalDbService.instance.getAnnouncements();
+  final Future<List<Announcement>> _announcementsFuture = LocalDbService
+      .instance
+      .getAnnouncements();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Announcements'),
-      ),
+      appBar: AppBar(title: const Text('Announcements')),
       body: FutureBuilder<List<Announcement>>(
         future: _announcementsFuture,
         builder: (context, snapshot) {
@@ -39,8 +39,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             itemCount: announcements.length,
             itemBuilder: (context, index) {
               final announcement = announcements[index];
-              final formattedDate =
-                  announcement.postedAt.toIso8601String().split('T')[0];
+              final formattedDate = announcement.postedAt
+                  .toIso8601String()
+                  .split('T')[0];
 
               return Card(
                 elevation: 1,
@@ -51,10 +52,12 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                     vertical: 8.0,
                   ),
                   leading: CircleAvatar(
-                    backgroundColor:
-                        Theme.of(context).colorScheme.secondaryContainer,
-                    foregroundColor:
-                        Theme.of(context).colorScheme.onSecondaryContainer,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .secondaryContainer,
+                    foregroundColor: Theme.of(context)
+                        .colorScheme
+                        .onSecondaryContainer,
                     child: const Icon(Icons.campaign),
                   ),
                   title: Text(
@@ -111,11 +114,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
-            Icon(
-              Icons.campaign_outlined,
-              size: 64,
-              color: Colors.grey,
-            ),
+            Icon(Icons.campaign_outlined, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text(
               'No Announcements',

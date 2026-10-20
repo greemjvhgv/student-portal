@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../widgets/portal_app_bar.dart';
 
+/// Owner: Annuschka. The D3 "Conflict Resolved" pop-up (Figure 8).
+///
+/// Shown after a sync when the server rejected an offline change because
+/// its own version was newer (server wins, FR11–FR13, US06).
 Future<void> showConflictResolvedDialog(
   BuildContext context, {
   required String recordName,

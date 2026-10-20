@@ -12,7 +12,7 @@ import bcrypt
 from sqlalchemy import select
 
 from app.database import Base, SessionLocal, engine
-import app.models #to register all sqlalchemy models
+import app.models
 
 from app.models import (
     Role,
@@ -48,7 +48,6 @@ COURSES = [
 
 
 def get_or_create(db, model, lookup, defaults=None):
-    """Find an existing record or create it without duplicating it."""
     instance = db.execute(
         select(model).filter_by(**lookup)
     ).scalar_one_or_none()

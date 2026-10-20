@@ -4,6 +4,9 @@ import 'auth_service.dart';
 import 'connectivity_service.dart';
 import 'local_db_service.dart';
 
+/// Owner: Annuschka (sync client).
+///
+/// The outcome of one sync, shown on the Sync Status screen.
 class SyncResult {
   const SyncResult({
     this.pushed = 0,
@@ -14,8 +17,11 @@ class SyncResult {
   });
 
   final int pushed;
+
   final int waiting;
+
   final List<Map<String, dynamic>> conflicts;
+
   final bool contactedServer;
   final String? error;
 
@@ -23,7 +29,7 @@ class SyncResult {
 
   String get summary {
     final waitingNote = waiting > 0
-        ? ' $waiting grade quer${waiting == 1 ? 'y is' : 'ies are'} waiting until the server supports them.'
+        ? ' $waiting grade quer${waiting == 1 ? 'y needs' : 'ies need'} to be flagged again.'
         : '';
     if (!contactedServer) return 'Nothing to send.$waitingNote';
     return 'Synced – $pushed change${pushed == 1 ? '' : 's'} sent, latest data downloaded.$waitingNote';
@@ -63,9 +69,17 @@ class SyncService {
 
     try {
       final pending = await db.getPendingChanges();
-      final pushable = pending.where((c) => c.entityType == 'assignments').toList();
+      final pushable = pending
+          .where(
+            (c) =>
+                c.entityType == 'assignments' ||
+                (c.entityType == 'grade_queries' && c.entityId > 0),
+          )
+          .toList();
       final waiting = pending.length - pushable.length;
       final conflicts = <Map<String, dynamic>>[];
+      // Files of accepted submissions: assignment id -> path on the phone.
+      final uploads = <int, String>{};
       var pushed = 0;
       var contacted = false;
       String? error;
@@ -74,21 +88,30 @@ class SyncService {
         try {
           final response = await ApiService.instance.pushChanges([
             for (final change in pushable)
-              {
-                'table': 'assignments',
-                'id': change.entityId,
-                'status': change.payload['status'],
-                'client_updated_at': change.payload['client_updated_at'],
-              },
+              if (change.entityType == 'grade_queries')
+                {
+                  'table': 'grade_queries',
+                  'id': change.entityId,
+                  'status': 'pending',
+                  'reason': change.payload['reason'],
+                  'client_updated_at': change.payload['client_updated_at'],
+                }
+              else
+                {
+                  'table': 'assignments',
+                  'id': change.entityId,
+                  'status': change.payload['status'],
+                  'client_updated_at': change.payload['client_updated_at'],
+                },
           ]);
           contacted = true;
-          // Conflicts reported by the server, by record id (server wins).
           final serverConflicts = {
             for (final c in response['conflicts'] as List? ?? const [])
-              (c as Map)['id']: c,
+              '${(c as Map)['table']}:${c['id']}': c,
           };
           for (final change in pushable) {
-            final serverConflict = serverConflicts[change.entityId];
+            final serverConflict =
+                serverConflicts['${change.entityType}:${change.entityId}'];
             if (serverConflict != null) {
               await db.markChangeConflict(change.syncId);
               conflicts.add({
@@ -98,7 +121,11 @@ class SyncService {
               });
             } else {
               await db.markChangeSynced(change.syncId);
-              await db.setAssignmentStatus(change.entityId, 'submitted');
+              if (change.entityType == 'assignments') {
+                await db.setAssignmentStatus(change.entityId, 'submitted');
+                final filePath = change.payload['file_path'] as String?;
+                if (filePath != null) uploads[change.entityId] = filePath;
+              }
               pushed++;
             }
           }
@@ -113,15 +140,34 @@ class SyncService {
       final studentId = await AuthService.getStudentId();
       if (studentId != null) {
         try {
-          await db.saveServerSnapshot(await ApiService.instance.pullChanges(studentId));
+          await db.saveServerSnapshot(
+            await ApiService.instance.pullChanges(studentId),
+          );
           contacted = true;
         } on ApiException catch (e) {
           error ??= 'Could not download the latest data: ${e.message}';
         }
       }
 
+      for (final upload in uploads.entries) {
+        final submissionId = (await db.getAssignment(upload.key))?.submissionId;
+        if (submissionId == null) continue;
+        try {
+          await ApiService.instance.uploadSubmissionFile(
+            submissionId,
+            upload.value,
+          );
+        } on Exception catch (e) {
+          error ??=
+              'Submitted, but the file was not uploaded ($e) – use "Replace file".';
+        }
+      }
+
       if (contacted) {
-        await db.setMeta('last_synced_at', DateTime.now().toUtc().toIso8601String());
+        await db.setMeta(
+          'last_synced_at',
+          DateTime.now().toUtc().toIso8601String(),
+        );
       }
       return SyncResult(
         pushed: pushed,

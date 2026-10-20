@@ -24,22 +24,22 @@ class PendingChange {
   });
 
   String get label => switch (entityType) {
-        'assignments' => 'Assignment: ${payload['title'] ?? entityId}',
-        'grade_queries' => 'Grade query - ${payload['module_code'] ?? ''}',
-        _ => '$entityType #$entityId',
-      };
+    'assignments' => 'Assignment: ${payload['title'] ?? entityId}',
+    'grade_queries' => 'Grade query - ${payload['module_code'] ?? ''}',
+    _ => '$entityType #$entityId',
+  };
 
   factory PendingChange.fromRow(Map<String, Object?> row) => PendingChange(
-        syncId: row['sync_id'] as int,
-        entityType: row['entity_type'] as String,
-        entityId: row['entity_id'] as int,
-        operationType: row['operation_type'] as String,
-        payload: jsonDecode(row['payload'] as String) as Map<String, dynamic>,
-        createdAt: DateTime.parse(row['created_at'] as String),
-        syncedAt: row['synced_at'] == null
-            ? null
-            : DateTime.parse(row['synced_at'] as String),
-        status: row['status'] as String,
-        attempts: row['attempts'] as int,
-      );
+    syncId: row['sync_id'] as int,
+    entityType: row['entity_type'] as String,
+    entityId: row['entity_id'] as int,
+    operationType: row['operation_type'] as String,
+    payload: jsonDecode(row['payload'] as String) as Map<String, dynamic>,
+    createdAt: DateTime.parse(row['created_at'] as String),
+    syncedAt: row['synced_at'] == null
+        ? null
+        : DateTime.parse(row['synced_at'] as String),
+    status: row['status'] as String,
+    attempts: row['attempts'] as int,
+  );
 }

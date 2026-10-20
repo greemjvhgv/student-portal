@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/timetable_entry.dart';
 import '../services/local_db_service.dart';
 
+/// Owner: Charleen. The student's weekly timetable (US01), read from the
+/// phone's local database, so it also works offline. Each slot shows the
+/// day, time and venue, with the class type as a chip.
 class TimetableScreen extends StatefulWidget {
   const TimetableScreen({super.key});
 
@@ -10,15 +13,13 @@ class TimetableScreen extends StatefulWidget {
 }
 
 class _TimetableScreenState extends State<TimetableScreen> {
-  final Future<List<TimetableEntry>> _entriesFuture =
-      LocalDbService.instance.getTimetable();
+  final Future<List<TimetableEntry>> _entriesFuture = LocalDbService.instance
+      .getTimetable();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Timetable'),
-      ),
+      appBar: AppBar(title: const Text('My Timetable')),
       body: FutureBuilder<List<TimetableEntry>>(
         future: _entriesFuture,
         builder: (context, snapshot) {
@@ -42,10 +43,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
                 margin: const EdgeInsets.only(bottom: 12.0),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor:
-                        Theme.of(context).colorScheme.primaryContainer,
-                    foregroundColor:
-                        Theme.of(context).colorScheme.onPrimaryContainer,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primaryContainer,
+                    foregroundColor: Theme.of(context)
+                        .colorScheme
+                        .onPrimaryContainer,
                     child: Text(
                       entry.type.substring(0, 1).toUpperCase(),
                       style: const TextStyle(fontWeight: FontWeight.bold),
@@ -61,7 +64,9 @@ class _TimetableScreenState extends State<TimetableScreen> {
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4.0),
                     child: Text(
-                      '${entry.day} at ${entry.time} \u2022 ${entry.type}',
+                      entry.venue == null
+                          ? '${entry.day} at ${entry.time}'
+                          : '${entry.day} at ${entry.time} \u2022 ${entry.venue}',
                       style: const TextStyle(fontSize: 14),
                     ),
                   ),
@@ -88,11 +93,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
-            Icon(
-              Icons.calendar_today_outlined,
-              size: 64,
-              color: Colors.grey,
-            ),
+            Icon(Icons.calendar_today_outlined, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text(
               'No Timetable Entries',

@@ -19,13 +19,6 @@ router = APIRouter(prefix="/grades", tags=["grades"])
 
 @router.get("/{student_id}")
 def get_grades(student_id: int, db: Session = Depends(get_db)):
-    """
-    Return all grades belonging to the requested student.
-
-    Grade records are joined to Assignment and Course so that the
-    course code can be returned as module_code, matching the API contract.
-    """
-
     results = (
         db.query(Grade, Course.course_code)
         .join(
