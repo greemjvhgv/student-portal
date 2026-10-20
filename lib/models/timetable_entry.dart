@@ -1,3 +1,7 @@
+/// One timetable slot, as returned by GET /sync/pull (docs/API_CONTRACT.md)
+/// and stored in the phone's local `timetable` table.
+/// Backs US01 / the Dashboard wireframe's "Today's Timetable" card
+/// (Charleen's screens). [venue] is the room, e.g. "Lab C303".
 class TimetableEntry {
   final String moduleCode;
   final String day;

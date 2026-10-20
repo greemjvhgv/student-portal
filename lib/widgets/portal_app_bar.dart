@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// The navy app bar used on every screen in the D3 wireframes.
 class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
   const PortalAppBar({super.key, required this.title});
 

@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
 import '../models/assignment.dart';
 import '../models/pending_change.dart';
 import '../services/api_service.dart';
@@ -38,6 +39,8 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
   static const _bannerText = Color(0xFFD32F2F);
   static const _doneFill = Color(0xFFE8F5E9);
   static const _doneText = Color(0xFF2E7D32);
+
+  /// The file types the backend accepts (submission_files.py).
   static const _allowedExtensions = ['pdf', 'docx', 'txt'];
 
   final _notesController = TextEditingController();
@@ -60,6 +63,8 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
     super.dispose();
   }
 
+  /// Re-reads the assignment (status, submission id) and the queue, e.g.
+  /// after a sync finished in the background.
   Future<void> _reload() async {
     final latest = await LocalDbService.instance.getAssignment(
       widget.assignment.id,
@@ -136,6 +141,7 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
     _showMessage(message);
   }
 
+  /// Uploads a new file for the submitted assignment (CRUD: update).
   Future<void> _replaceFile() async {
     final submissionId = _assignment.submissionId;
     final file = await _chooseFile();
@@ -152,6 +158,8 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
     await _reload();
   }
 
+  /// Withdraws the submission (CRUD: delete). The assignment stays in the
+  /// list as "not submitted", so it can be submitted again.
   Future<void> _withdraw() async {
     final submissionId = _assignment.submissionId;
     if (submissionId == null) return;
@@ -193,6 +201,7 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
     borderSide: BorderSide(color: color, width: 2),
   );
 
+  /// Shown instead of the form once the server has the submission.
   Widget _submittedCard(bool isOnline) {
     final canChange =
         isOnline && _assignment.submissionId != null && !_isSaving;

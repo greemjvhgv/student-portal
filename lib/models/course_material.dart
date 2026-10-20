@@ -1,3 +1,6 @@
+/// One course material (US04), stored in the phone's local
+/// `course_materials` table. [localPath] is set once the file is cached,
+/// so it can be opened offline.
 class CourseMaterial {
   final String moduleCode;
   final String title;

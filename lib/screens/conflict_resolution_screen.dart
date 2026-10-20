@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../widgets/portal_app_bar.dart';
 
 /// Owner: Annuschka. The D3 "Conflict Resolved" pop-up (Figure 8).
@@ -19,6 +20,8 @@ Future<void> showConflictResolvedDialog(
   );
 }
 
+/// [recordName] is the record that changed, [serverUpdateTime] when the
+/// server's newer version was saved.
 class ConflictResolvedDialog extends StatelessWidget {
   const ConflictResolvedDialog({
     super.key,

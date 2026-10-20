@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-
+/// Draws the dashed rounded border of the wireframes' "Tap to attach"
+/// and "Not cached" boxes.
 class DashedBorderPainter extends CustomPainter {
   const DashedBorderPainter({required this.color});
 

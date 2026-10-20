@@ -1,3 +1,7 @@
+/// A grade query the student sent about one of their grades (wireframe
+/// Fig 5 "Flag a grade query"), as returned by GET /sync/pull and stored in
+/// the phone's local `grade_queries` table.
+/// [status] is "pending" (can still be edited or withdrawn) or "resolved".
 class GradeQuery {
   final int queryId;
   final int gradeId;

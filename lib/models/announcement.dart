@@ -1,3 +1,5 @@
+/// Mirrors GET /announcements - see docs/API_CONTRACT.md. Backs US02 / the
+/// Dashboard wireframe's "Announcements" card (Charleen's screen).
 class Announcement {
   final String title;
   final String body;

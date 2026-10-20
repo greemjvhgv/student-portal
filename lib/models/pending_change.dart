@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+/// One change made offline, waiting in the local `pending_sync` queue
+/// (FR5, FR6). Mirrors the backend's SyncOperation model. [status] is
+/// pending / failed (retried) / synced / conflict.
 class PendingChange {
   final int syncId;
   final String entityType;
