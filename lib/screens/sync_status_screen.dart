@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../models/pending_change.dart';
 import '../services/connectivity_service.dart';
 import '../services/local_db_service.dart';
@@ -8,11 +7,7 @@ import '../utils/time_format.dart';
 import '../widgets/portal_app_bar.dart';
 import 'conflict_resolution_screen.dart';
 
-/// Sync Status (D3 Figure 6, US11): live connection card, the real offline
-/// queue from the local database ("Pending items"), recently synced items,
-/// and a manual "Sync Now" (FR14). Refreshes after every sync, and shows
-/// the "Conflict Resolved" pop-up (Figure 8) when the server's newer
-/// version wins (FR12).
+.
 class SyncStatusScreen extends StatefulWidget {
   const SyncStatusScreen({super.key});
 
@@ -50,13 +45,10 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
     _syncedFuture = LocalDbService.instance.getRecentlySynced();
   }
 
-  /// Reloads the lists whenever a sync finishes or the queue changes.
   void _onSyncChanged() {
     if (mounted) setState(_loadQueue);
   }
 
-  /// Manual sync (US11): explains when offline, shows conflicts (Fig 8)
-  /// and a short summary otherwise.
   Future<void> _syncNow() async {
     setState(() => _isSyncing = true);
     final result = await SyncService.instance.syncNow();
@@ -72,9 +64,8 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.error ?? result.summary)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(result.error ?? result.summary)));
   }
 
   Widget _statusCard(bool isOnline) {
@@ -131,7 +122,10 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
         children: [
           Text(title, style: const TextStyle(fontSize: 17, color: _navy)),
           const SizedBox(height: 4),
-          Text(subtitle, style: const TextStyle(fontSize: 16, color: _blueText)),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 16, color: _blueText),
+          ),
         ],
       ),
     );
@@ -192,7 +186,12 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
                         style: TextStyle(color: Colors.grey),
                       ),
                     for (final change in pending)
-                      _itemCard(change.label, _pendingSubtitle(change), _queueFill, _queueBorder),
+                      _itemCard(
+                        change.label,
+                        _pendingSubtitle(change),
+                        _queueFill,
+                        _queueBorder,
+                      ),
                   ],
                 );
               },
@@ -211,7 +210,12 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
                         style: TextStyle(color: Colors.grey),
                       ),
                     for (final change in synced)
-                      _itemCard(change.label, _syncedSubtitle(change), _syncedFill, _syncedBorder),
+                      _itemCard(
+                        change.label,
+                        _syncedSubtitle(change),
+                        _syncedFill,
+                        _syncedBorder,
+                      ),
                   ],
                 );
               },

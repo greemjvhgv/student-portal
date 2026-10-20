@@ -36,9 +36,6 @@ app = FastAPI(
 )
 
 
-# Needed when the Flutter app runs in a browser (flutter run -d chrome); the
-# web app is served from a random localhost port. Native/mobile ignores CORS.
-# Bearer tokens are sent in a header, not cookies, so credentials stay off.
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
@@ -52,11 +49,9 @@ def root():
     return {"status": "ok", "service": "student-portal-api"}
 
 
-# Open: logging in.
 app.include_router(auth.router)
 app.include_router(lecturer.router)
 
-# Students only, and only their own data.
 _student_only = [Depends(require_student_access)]
 app.include_router(timetable.router, dependencies=_student_only)
 app.include_router(announcements.router, dependencies=_student_only)

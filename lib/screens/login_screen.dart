@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
-
 import '../services/auth_service.dart';
 import '../services/sync_service.dart';
 
-/// Login screen (D3 Figure 3): navy "Student Portal" bar, Eduvos logo,
-/// student number + password fields, a Log In button and a footer note
-/// that the app works offline once logged in.
-///
-/// Logs in through [AuthService] and shows failures (wrong password, no
-/// connection) through [_errorText]. After a successful login the
-/// student's data is downloaded in the background (FR3).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -23,8 +15,10 @@ class _LoginScreenState extends State<LoginScreen> {
   static const _fieldBorder = Color(0xFFB0C4DE);
   static const _taglineBlue = Color(0xFF1E88E5);
 
-  static final RegExp _studentNumberPattern =
-      RegExp(r'^EDUV\d{7}$', caseSensitive: false);
+  static final RegExp _studentNumberPattern = RegExp(
+    r'^EDUV\d{7}$',
+    caseSensitive: false,
+  );
 
   final _formKey = GlobalKey<FormState>();
   final _studentNumberController = TextEditingController();
@@ -61,7 +55,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Download the student's data in the background (FR3).
     SyncService.instance.syncNow();
 
     if (!mounted) return;
@@ -70,9 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   InputDecoration _fieldDecoration(String hint) {
     OutlineInputBorder border(Color color) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: color, width: 2),
-        );
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: color, width: 2),
+    );
     return InputDecoration(
       hintText: hint,
       filled: true,
@@ -113,7 +106,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // TODO: swap for the real Eduvos crest image once it is in assets/.
                 const Icon(Icons.school, size: 72, color: _navy),
                 const Text(
                   'Eduvos',
@@ -154,8 +146,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: true,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _handleLogin(),
-                  validator: (value) =>
-                      (value == null || value.isEmpty) ? 'Enter your password' : null,
+                  validator: (value) => (value == null || value.isEmpty)
+                      ? 'Enter your password'
+                      : null,
                 ),
                 if (_errorText != null) ...[
                   const SizedBox(height: 12),

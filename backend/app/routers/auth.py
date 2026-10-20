@@ -4,10 +4,8 @@ Owner: Ruan (backend: project structure + authentication).
 POST /auth/login — see docs/API_CONTRACT.md for the request/response shape.
 """
 from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
 from app.core.security import create_access_token, hash_password, verify_password
 from app.database import get_db
 from app.models.student import Student
@@ -16,8 +14,6 @@ from app.schemas.auth import LoginRequest, LoginResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Verified against when the student number is unknown, so an unknown number
-# costs the same as a wrong password (no timing leak of which numbers exist).
 _DUMMY_HASH = hash_password("not-a-real-password")
 
 

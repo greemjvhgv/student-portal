@@ -25,6 +25,7 @@ class SyncPushItem(BaseModel):
     id: int
     status: str
     client_updated_at: datetime
+    reason: str | None = None
 
 
 @router.post("/push")
@@ -42,7 +43,7 @@ def sync_push(
                 student_id=student.student_id,
                 table_name=change.table,
                 record_id=change.id,
-                fields={"status": change.status},
+                fields={"status": change.status, "reason": change.reason},
                 client_updated_at=change.client_updated_at,
             )
 

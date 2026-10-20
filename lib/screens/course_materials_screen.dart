@@ -4,6 +4,9 @@ import '../services/local_db_service.dart';
 import '../widgets/dashed_border_painter.dart';
 import '../widgets/portal_app_bar.dart';
 
+/// Owner: Annuschka. Matches the D3 "Course Materials" wireframe (Fig 4).
+/// Lists the materials per module (US04) from the local database and
+/// marks which ones are cached for offline use.
 class CourseMaterialsScreen extends StatefulWidget {
   const CourseMaterialsScreen({super.key});
 
@@ -23,14 +26,15 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
   static const _warningBorder = Color(0xFFFFD54F);
   static const _warningText = Color(0xFF8D4A00);
 
-  final Future<List<CourseMaterial>> _materialsFuture =
-      LocalDbService.instance.getCourseMaterials();
+  final Future<List<CourseMaterial>> _materialsFuture = LocalDbService.instance
+      .getCourseMaterials();
 
   void _openMaterial(CourseMaterial material) {
     final message = material.isCached
         ? 'Opening ${material.title}'
         : '${material.title} is not downloaded yet – it will download when you are online';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _materialTile(CourseMaterial material) {
@@ -72,7 +76,9 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                 child: content,
               )
             : CustomPaint(
-                foregroundPainter: const DashedBorderPainter(color: _missingRed),
+                foregroundPainter: const DashedBorderPainter(
+                  color: _missingRed,
+                ),
                 child: Container(
                   decoration: BoxDecoration(
                     color: _missingFill,
@@ -125,7 +131,9 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                   );
                 }
                 if (snapshot.hasError) {
-                  return const Text('Could not load course materials from this device.');
+                  return const Text(
+                    'Could not load course materials from this device.',
+                  );
                 }
                 final materials = snapshot.data!;
                 if (materials.isEmpty) {
@@ -149,7 +157,11 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.warning_amber_rounded, size: 18, color: _warningText),
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 18,
+                    color: _warningText,
+                  ),
                   SizedBox(width: 6),
                   Flexible(
                     child: Text(

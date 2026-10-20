@@ -19,13 +19,6 @@ router = APIRouter(prefix="/timetable", tags=["timetable"])
 
 @router.get("/{student_id}")
 def get_timetable(student_id: int, db: Session = Depends(get_db)):
-    """
-    Return timetable entries for the requested student.
-
-    Enrolment links the student to their courses. Each course is then
-    joined to its corresponding timetable entries.
-    """
-
     results = (
         db.query(Timetable, Course.course_code)
         .join(

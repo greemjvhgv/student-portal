@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+
 import '../models/assignment.dart';
 import '../services/local_db_service.dart';
 import '../utils/time_format.dart';
 import '../widgets/portal_app_bar.dart';
 import 'submit_assignment_screen.dart';
 
+/// Owner: Annuschka. The student's assignments with their status (US05):
+/// not submitted, queued (waiting to sync) or submitted. Read from the
+/// local database, so it works offline
 class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({super.key});
 
@@ -15,8 +19,8 @@ class AssignmentsScreen extends StatefulWidget {
 class _AssignmentsScreenState extends State<AssignmentsScreen> {
   static const _navy = PortalAppBar.navy;
 
-  Future<List<Assignment>> _assignmentsFuture =
-      LocalDbService.instance.getAssignments();
+  Future<List<Assignment>> _assignmentsFuture = LocalDbService.instance
+      .getAssignments();
 
   Future<void> _open(Assignment assignment) async {
     await Navigator.push(

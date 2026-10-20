@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../models/announcement.dart';
 
 /// Displays the full content of a selected announcement.
 class AnnouncementDetailScreen extends StatelessWidget {
   final Announcement announcement;
 
-  const AnnouncementDetailScreen({
-    super.key,
-    required this.announcement,
-  });
+  const AnnouncementDetailScreen({super.key, required this.announcement});
 
   @override
   Widget build(BuildContext context) {
@@ -16,9 +14,7 @@ class AnnouncementDetailScreen extends StatelessWidget {
     final formattedDate = announcement.postedAt.toIso8601String().split('T')[0];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Announcement Details'),
-      ),
+      appBar: AppBar(title: const Text('Announcement Details')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -46,11 +42,7 @@ class AnnouncementDetailScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(
-                  Icons.calendar_today,
-                  size: 16,
-                  color: Colors.grey,
-                ),
+                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                 const SizedBox(width: 6),
                 Text(
                   'Posted on $formattedDate',
@@ -65,10 +57,7 @@ class AnnouncementDetailScreen extends StatelessWidget {
             const Divider(height: 32, thickness: 1),
             Text(
               announcement.body,
-              style: const TextStyle(
-                fontSize: 16,
-                height: 1.5,
-              ),
+              style: const TextStyle(fontSize: 16, height: 1.5),
             ),
           ],
         ),
@@ -76,4 +65,3 @@ class AnnouncementDetailScreen extends StatelessWidget {
     );
   }
 }
-

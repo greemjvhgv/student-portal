@@ -1,3 +1,7 @@
+"""
+Owner: Leo. Tests for the submissions module: replacing a file (update)
+and withdrawing (delete), only for the logged-in student's own submissions.
+"""
 
 import pytest
 
@@ -178,8 +182,9 @@ def test_student_cannot_update_another_students_submission(client):
     assert response.json()["detail"] == "Submission not found."
 
 
-def test_student_can_delete_own_submission(client):
-    """Verify that a student can delete their own submission."""
+def test_student_can_withdraw_own_submission(client):
+    """Verify that a student can withdraw their own submission. The record
+    is kept as "not_submitted", so withdrawing again is harmless."""
 
     test_client, test_data = client
 
@@ -194,16 +199,17 @@ def test_student_can_delete_own_submission(client):
     )
 
     assert response.status_code == 200
-    assert response.json()["message"] == "Submission deleted successfully."
+    assert response.json()["message"] == "Submission withdrawn successfully."
     assert response.json()["submission_id"] == submission_id
+    assert response.json()["status"] == "not_submitted"
 
-    # A second deletion should fail because the record no longer exists.
+    # The record still exists, so a second withdraw also succeeds.
     second_response = test_client.delete(
         f"/assignments/submissions/{submission_id}",
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    assert second_response.status_code == 404
+    assert second_response.status_code == 200
 
 
 def test_student_cannot_delete_another_students_submission(client):
@@ -334,8 +340,8 @@ def test_student_cannot_delete_nonexistent_submission(client):
     assert response.json()["detail"] == "Submission not found."
 
 
-def test_deleting_submission_removes_uploaded_file(client):
-    """Deleting a submission must also remove its stored file."""
+def test_withdrawing_submission_removes_uploaded_file(client):
+    """Withdrawing a submission must also remove its stored file."""
 
     test_client, test_data = client
 
@@ -366,7 +372,7 @@ def test_deleting_submission_removes_uploaded_file(client):
 
     assert stored_path.exists()
 
-    # Delete the submission.
+    # Withdraw the submission.
     delete_response = test_client.delete(
         f"/assignments/submissions/{submission_id}",
         headers={"Authorization": f"Bearer {token}"},

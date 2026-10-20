@@ -5,16 +5,25 @@ import '../models/announcement.dart';
 import '../models/assignment.dart';
 import '../models/course_material.dart';
 import '../models/grade.dart';
+import '../models/grade_query.dart';
 import '../models/pending_change.dart';
 import '../models/timetable_entry.dart';
 
+/// Owner: Annuschka (local database + sync client).
+///
+/// The SQLite database on the phone (sqflite). Screens read cached data
+/// from here, so they keep working offline (FR2, FR4). Table and column
+/// names mirror docs/API_CONTRACT.md. `pending_sync` mirrors the backend's
+/// SyncOperation model and holds changes made offline until SyncService
+/// pushes them (FR5, FR6). `app_meta` stores small values such as the time
+/// of the last successful sync.
 class LocalDbService {
   LocalDbService._internal();
   static final LocalDbService instance = LocalDbService._internal();
 
   static const _dbName = 'student_portal.db';
 
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
 
   Database? _db;
 
@@ -40,10 +49,25 @@ class LocalDbService {
       await db.execute('ALTER TABLE pending_sync ADD COLUMN synced_at TEXT');
       await _insertSampleAssignments(db);
     }
+    if (oldVersion < 3) {
+      await db.execute(
+        'ALTER TABLE assignments ADD COLUMN submission_id INTEGER',
+      );
+      await db.execute('ALTER TABLE timetable ADD COLUMN venue TEXT');
+      await db.execute(_createGradeQueries);
+    }
   }
 
   static const _createAppMeta =
       'CREATE TABLE app_meta (key TEXT PRIMARY KEY, value TEXT)';
+
+  static const _createGradeQueries =
+      'CREATE TABLE grade_queries ('
+      'query_id INTEGER PRIMARY KEY, '
+      'grade_id INTEGER NOT NULL, '
+      'module_code TEXT, '
+      'reason TEXT NOT NULL, '
+      'status TEXT NOT NULL)';
 
   static const List<String> _createTables = [
     'CREATE TABLE grades ('
@@ -57,13 +81,15 @@ class LocalDbService {
         'module_code TEXT NOT NULL, '
         'title TEXT NOT NULL, '
         'status TEXT NOT NULL, '
-        'due_date TEXT)',
+        'due_date TEXT, '
+        'submission_id INTEGER)',
     'CREATE TABLE timetable ('
         'id INTEGER PRIMARY KEY AUTOINCREMENT, '
         'module_code TEXT NOT NULL, '
         'day TEXT NOT NULL, '
         'time TEXT NOT NULL, '
-        'type TEXT)',
+        'type TEXT, '
+        'venue TEXT)',
     'CREATE TABLE announcements ('
         'id INTEGER PRIMARY KEY AUTOINCREMENT, '
         'title TEXT NOT NULL, '
@@ -86,6 +112,7 @@ class LocalDbService {
         'attempts INTEGER NOT NULL DEFAULT 0, '
         'synced_at TEXT)',
     _createAppMeta,
+    _createGradeQueries,
   ];
 
   Future<void> _insertPlaceholderData(Database db) async {
@@ -93,36 +120,100 @@ class LocalDbService {
     final batch = db.batch();
 
     for (final grade in [
-      {'module_code': 'ITMDA3-34', 'module_name': 'Project - Mobile & Web Services', 'mark': 84.0},
-      {'module_code': 'ITMTA3-33', 'module_name': 'Calculus Mathematics', 'mark': 72.0},
-      {'module_code': 'ITOPE3-33', 'module_name': 'Operating Systems', 'mark': null},
+      {
+        'module_code': 'ITMDA3-34',
+        'module_name': 'Project - Mobile & Web Services',
+        'mark': 84.0,
+      },
+      {
+        'module_code': 'ITMTA3-33',
+        'module_name': 'Calculus Mathematics',
+        'mark': 72.0,
+      },
+      {
+        'module_code': 'ITOPE3-33',
+        'module_name': 'Operating Systems',
+        'mark': null,
+      },
     ]) {
       batch.insert('grades', {...grade, 'updated_at': now.toIso8601String()});
     }
 
     for (final entry in [
-      {'module_code': 'ITMDA3-34', 'day': 'Monday', 'time': '15:00', 'type': 'Consultation'},
-      {'module_code': 'ITMDA3-34', 'day': 'Monday', 'time': '18:00', 'type': 'Lecture'},
-      {'module_code': 'ITMTA3-33', 'day': 'Tuesday', 'time': '11:30', 'type': 'Practical'},
-      {'module_code': 'ITOPE3-33', 'day': 'Thursday', 'time': '10:00', 'type': 'Tutorial'},
+      {
+        'module_code': 'ITMDA3-34',
+        'day': 'Monday',
+        'time': '15:00',
+        'type': 'Consultation',
+      },
+      {
+        'module_code': 'ITMDA3-34',
+        'day': 'Monday',
+        'time': '18:00',
+        'type': 'Lecture',
+      },
+      {
+        'module_code': 'ITMTA3-33',
+        'day': 'Tuesday',
+        'time': '11:30',
+        'type': 'Practical',
+      },
+      {
+        'module_code': 'ITOPE3-33',
+        'day': 'Thursday',
+        'time': '10:00',
+        'type': 'Tutorial',
+      },
     ]) {
       batch.insert('timetable', entry);
     }
 
     for (final announcement in [
-      {'title': 'Deliverable 3 due 4 Sept', 'body': 'Please upload all Deliverable 3 work before 4 Sept.', 'posted_at': '2026-09-01'},
-      {'title': 'Portal maintenance', 'body': 'Saturday 10pm', 'posted_at': '2026-09-28'},
-      {'title': 'New study guide uploaded', 'body': 'The updated ITMDA3-34 study guide is available.', 'posted_at': '2026-10-01'},
+      {
+        'title': 'Deliverable 3 due 4 Sept',
+        'body': 'Please upload all Deliverable 3 work before 4 Sept.',
+        'posted_at': '2026-09-01',
+      },
+      {
+        'title': 'Portal maintenance',
+        'body': 'Saturday 10pm',
+        'posted_at': '2026-09-28',
+      },
+      {
+        'title': 'New study guide uploaded',
+        'body': 'The updated ITMDA3-34 study guide is available.',
+        'posted_at': '2026-10-01',
+      },
     ]) {
       batch.insert('announcements', announcement);
     }
 
     for (final material in [
-      {'module_code': 'ITMDA3-34', 'title': 'Week 6 - Lecture Slides.pdf', 'local_path': 'cached'},
-      {'module_code': 'ITMDA3-34', 'title': 'Study Guide - Databases.pdf', 'local_path': null},
-      {'module_code': 'ITMTA3-33', 'title': 'Week 6 - Lecture Slides.pdf', 'local_path': 'cached'},
-      {'module_code': 'ITMTA3-33', 'title': 'Week 6 - Course Slides.pdf', 'local_path': 'cached'},
-      {'module_code': 'ITOPE3-33', 'title': 'Week 6 - Lecture Slides.pdf', 'local_path': 'cached'},
+      {
+        'module_code': 'ITMDA3-34',
+        'title': 'Week 6 - Lecture Slides.pdf',
+        'local_path': 'cached',
+      },
+      {
+        'module_code': 'ITMDA3-34',
+        'title': 'Study Guide - Databases.pdf',
+        'local_path': null,
+      },
+      {
+        'module_code': 'ITMTA3-33',
+        'title': 'Week 6 - Lecture Slides.pdf',
+        'local_path': 'cached',
+      },
+      {
+        'module_code': 'ITMTA3-33',
+        'title': 'Week 6 - Course Slides.pdf',
+        'local_path': 'cached',
+      },
+      {
+        'module_code': 'ITOPE3-33',
+        'title': 'Week 6 - Lecture Slides.pdf',
+        'local_path': 'cached',
+      },
     ]) {
       batch.insert('course_materials', material);
     }
@@ -133,15 +224,42 @@ class LocalDbService {
 
   Future<void> _insertSampleAssignments(Database db) async {
     final now = DateTime.now();
-    String dueIn(int days) =>
-        DateTime(now.year, now.month, now.day + days, 23, 59).toUtc().toIso8601String();
+    String dueIn(int days) => DateTime(
+      now.year,
+      now.month,
+      now.day + days,
+      23,
+      59,
+    ).toUtc().toIso8601String();
 
     for (final assignment in [
-      {'id': 1, 'module_code': 'ITMDA3-34', 'title': 'Deliverable 4', 'status': 'not_submitted', 'due_date': dueIn(14)},
-      {'id': 2, 'module_code': 'ITMTA3-33', 'title': 'Assignment 2: Integration', 'status': 'not_submitted', 'due_date': dueIn(7)},
-      {'id': 3, 'module_code': 'ITOPE3-33', 'title': 'Practical 3: Scheduling', 'status': 'not_submitted', 'due_date': dueIn(21)},
+      {
+        'id': 1,
+        'module_code': 'ITMDA3-34',
+        'title': 'Deliverable 4',
+        'status': 'not_submitted',
+        'due_date': dueIn(14),
+      },
+      {
+        'id': 2,
+        'module_code': 'ITMTA3-33',
+        'title': 'Assignment 2: Integration',
+        'status': 'not_submitted',
+        'due_date': dueIn(7),
+      },
+      {
+        'id': 3,
+        'module_code': 'ITOPE3-33',
+        'title': 'Practical 3: Scheduling',
+        'status': 'not_submitted',
+        'due_date': dueIn(21),
+      },
     ]) {
-      await db.insert('assignments', assignment, conflictAlgorithm: ConflictAlgorithm.ignore);
+      await db.insert(
+        'assignments',
+        assignment,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
   }
 
@@ -149,7 +267,10 @@ class LocalDbService {
 
   Future<List<Grade>> getGrades() async {
     final db = await database;
-    final rows = await db.query('grades', orderBy: 'module_code');
+    final rows = await db.query(
+      'grades',
+      orderBy: 'mark IS NULL, module_code, id',
+    );
     return rows.map((row) => Grade.fromJson(row)).toList();
   }
 
@@ -177,17 +298,40 @@ class LocalDbService {
     return rows.map((row) => Assignment.fromJson(row)).toList();
   }
 
+  Future<Assignment?> getAssignment(int assignmentId) async {
+    final db = await database;
+    final rows = await db.query(
+      'assignments',
+      where: 'id = ?',
+      whereArgs: [assignmentId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : Assignment.fromJson(rows.first);
+  }
+
+  Future<List<GradeQuery>> getGradeQueries() async {
+    final db = await database;
+    final rows = await db.query('grade_queries', orderBy: 'query_id DESC');
+    return rows.map((row) => GradeQuery.fromJson(row)).toList();
+  }
+
   // ---------------------------------------------------------- Offline queue
+
   Future<void> queueAssignmentSubmission(
     Assignment assignment, {
     required String fileName,
+    String? filePath,
     String? notes,
   }) async {
     final db = await database;
     final now = DateTime.now().toUtc().toIso8601String();
     await db.transaction((txn) async {
-      await txn.update('assignments', {'status': 'queued'},
-          where: 'id = ?', whereArgs: [assignment.id]);
+      await txn.update(
+        'assignments',
+        {'status': 'queued'},
+        where: 'id = ?',
+        whereArgs: [assignment.id],
+      );
       await txn.insert('pending_sync', {
         'entity_type': 'assignments',
         'entity_id': assignment.id,
@@ -197,6 +341,7 @@ class LocalDbService {
           'module_code': assignment.moduleCode,
           'status': 'submitted',
           'file_name': fileName,
+          'file_path': filePath,
           'notes': notes,
           'client_updated_at': now,
         }),
@@ -223,23 +368,29 @@ class LocalDbService {
 
   Future<List<PendingChange>> getPendingChanges() async {
     final db = await database;
-    final rows = await db.query('pending_sync',
-        where: "status IN ('pending', 'failed')", orderBy: 'created_at');
+    final rows = await db.query(
+      'pending_sync',
+      where: "status IN ('pending', 'failed')",
+      orderBy: 'created_at',
+    );
     return rows.map(PendingChange.fromRow).toList();
   }
 
   Future<List<PendingChange>> getRecentlySynced({int limit = 5}) async {
     final db = await database;
-    final rows = await db.query('pending_sync',
-        where: "status IN ('synced', 'conflict')",
-        orderBy: 'synced_at DESC',
-        limit: limit);
+    final rows = await db.query(
+      'pending_sync',
+      where: "status IN ('synced', 'conflict')",
+      orderBy: 'synced_at DESC',
+      limit: limit,
+    );
     return rows.map(PendingChange.fromRow).toList();
   }
 
   Future<void> markChangeSynced(int syncId) => _finishChange(syncId, 'synced');
 
-  Future<void> markChangeConflict(int syncId) => _finishChange(syncId, 'conflict');
+  Future<void> markChangeConflict(int syncId) =>
+      _finishChange(syncId, 'conflict');
 
   Future<void> _finishChange(int syncId, String status) async {
     final db = await database;
@@ -261,22 +412,35 @@ class LocalDbService {
 
   Future<void> setAssignmentStatus(int assignmentId, String status) async {
     final db = await database;
-    await db.update('assignments', {'status': status},
-        where: 'id = ?', whereArgs: [assignmentId]);
+    await db.update(
+      'assignments',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [assignmentId],
+    );
   }
 
-Future<void> saveServerSnapshot(Map<String, dynamic> data) async {
+  Future<void> saveServerSnapshot(Map<String, dynamic> data) async {
     final db = await database;
     final queuedIds = {
       for (final change in await getPendingChanges())
         if (change.entityType == 'assignments') change.entityId,
     };
     final moduleNames = {
-      for (final row in await db.query('grades', columns: ['module_code', 'module_name']))
+      for (final row in await db.query(
+        'grades',
+        columns: ['module_code', 'module_name'],
+      ))
         row['module_code']: row['module_name'],
     };
     await db.transaction((txn) async {
-      for (final table in ['assignments', 'grades', 'timetable', 'announcements']) {
+      for (final table in [
+        'assignments',
+        'grades',
+        'timetable',
+        'announcements',
+        'grade_queries',
+      ]) {
         final rows = data[table];
         if (rows is! List) continue;
         await txn.delete(table);
@@ -293,6 +457,7 @@ Future<void> saveServerSnapshot(Map<String, dynamic> data) async {
       }
     });
   }
+
   // ------------------------------------------------------------- App values
 
   Future<String?> getMeta(String key) async {
@@ -303,8 +468,10 @@ Future<void> saveServerSnapshot(Map<String, dynamic> data) async {
 
   Future<void> setMeta(String key, String value) async {
     final db = await database;
-    await db.insert('app_meta', {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('app_meta', {
+      'key': key,
+      'value': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<DateTime?> getLastSyncedAt() async {

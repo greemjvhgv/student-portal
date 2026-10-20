@@ -1,0 +1,25 @@
+class GradeQuery {
+  final int queryId;
+  final int gradeId;
+  final String moduleCode;
+  final String reason;
+  final String status;
+
+  const GradeQuery({
+    required this.queryId,
+    required this.gradeId,
+    required this.moduleCode,
+    required this.reason,
+    required this.status,
+  });
+
+  bool get isPending => status == 'pending';
+
+  factory GradeQuery.fromJson(Map<String, dynamic> json) => GradeQuery(
+    queryId: json['query_id'] as int,
+    gradeId: json['grade_id'] as int,
+    moduleCode: json['module_code'] as String? ?? '',
+    reason: json['reason'] as String,
+    status: json['status'] as String,
+  );
+}

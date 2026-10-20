@@ -18,13 +18,6 @@ router = APIRouter(prefix="/course-materials", tags=["course-materials"])
 
 @router.get("/{module_code}")
 def get_course_materials(module_code: str, db: Session = Depends(get_db)):
-    """
-    Return course materials belonging to the requested module.
-
-    The API uses module_code while the database stores the corresponding
-    value as course_code in the Course model.
-    """
-
     materials = (
         db.query(CourseMaterial)
         .join(Course, CourseMaterial.course_id == Course.course_id)

@@ -14,19 +14,19 @@ class Grade {
   });
 
   factory Grade.fromJson(Map<String, dynamic> json) => Grade(
-        id: json['id'] as int?,
-        moduleCode: json['module_code'] as String,
-        moduleName: json['module_name'] as String?,
-        mark: (json['mark'] as num?)?.toDouble(),
-        updatedAt: json['updated_at'] == null
-            ? null
-            : DateTime.parse(json['updated_at'] as String),
-      );
+    id: json['id'] as int?,
+    moduleCode: json['module_code'] as String,
+    moduleName: json['module_name'] as String?,
+    mark: (json['mark'] as num?)?.toDouble(),
+    updatedAt: json['updated_at'] == null
+        ? null
+        : DateTime.parse(json['updated_at'] as String),
+  );
 
   Map<String, dynamic> toJson() => {
-        'module_code': moduleCode,
-        'module_name': moduleName,
-        'mark': mark,
-        'updated_at': updatedAt?.toIso8601String(),
-      };
+    'module_code': moduleCode,
+    'module_name': moduleName,
+    'mark': mark,
+    'updated_at': updatedAt?.toIso8601String(),
+  };
 }

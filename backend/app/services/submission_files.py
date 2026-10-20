@@ -1,21 +1,15 @@
-
-
 from pathlib import Path
 from uuid import uuid4
-
 from fastapi import HTTPException, UploadFile
 
-# Store uploaded files outside the application source directory.
 UPLOAD_DIR = Path(__file__).resolve().parents[2] / "uploads" / "submissions"
 
-# Maximum permitted upload size: 10 MB
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 
 async def save_submission_file(file: UploadFile) -> str:
-    """Validate and save a student submission file."""
 
     extension = Path(file.filename or "").suffix.lower()
 
@@ -54,7 +48,6 @@ async def save_submission_file(file: UploadFile) -> str:
 
 
 def delete_submission_file(file_path: str | None) -> None:
-    """Delete a previously stored submission file."""
 
     if not file_path:
         return
@@ -62,7 +55,6 @@ def delete_submission_file(file_path: str | None) -> None:
     root = UPLOAD_DIR.resolve()
     target = (root.parent.parent / file_path).resolve()
 
-    # Prevent deletion of files outside the submission directory.
     if not target.is_relative_to(root) or target == root:
         raise ValueError("Invalid submission file path.")
 

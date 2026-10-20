@@ -1,4 +1,9 @@
+"""
+Owner: Leo (backend: submission management).
 
+Replace a student's submission file (update) and withdraw a submission
+(delete) – always only for the logged-in student's own submission.
+"""
 
 from datetime import datetime, timezone
 
@@ -18,7 +23,6 @@ async def replace_submission_file(
     file: UploadFile,
     db: Session,
 ):
-    """Replace a submission file after verifying student ownership."""
 
     submission = (
         db.query(Submission)
@@ -51,7 +55,6 @@ async def replace_submission_file(
         delete_submission_file(new_file_path)
         raise
 
-    # Remove the previous file only after the database commit.
     if old_file_path and old_file_path != new_file_path:
         delete_submission_file(old_file_path)
 
@@ -62,13 +65,11 @@ async def replace_submission_file(
         "file_path": submission.file_path,
     }
 
-def delete_student_submission(
+def withdraw_student_submission(
     submission_id: int,
     student_id: int,
     db: Session,
 ):
-    """Delete a submission belonging to the verified student."""
-
     submission = (
         db.query(Submission)
         .filter(
@@ -87,17 +88,19 @@ def delete_student_submission(
     old_file_path = submission.file_path
 
     try:
-        db.delete(submission)
+        submission.status = "not_submitted"
+        submission.file_path = None
+        submission.submitted_at = None
         db.commit()
     except Exception:
         db.rollback()
         raise
 
-    # Delete the stored file only after the database commit.
     if old_file_path:
         delete_submission_file(old_file_path)
 
     return {
-        "message": "Submission deleted successfully.",
+        "message": "Submission withdrawn successfully.",
         "submission_id": submission_id,
+        "status": "not_submitted",
     }
