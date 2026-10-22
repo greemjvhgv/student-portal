@@ -13,6 +13,7 @@ class SyncResult {
   const SyncResult({
     this.pushed = 0,
     this.discarded = 0,
+    this.rejected = const [],
     this.conflicts = const [],
     this.contactedServer = false,
     this.error,
@@ -26,6 +27,8 @@ class SyncResult {
   /// grade_id). They are dropped, so they can't block the rest of the queue.
   final int discarded;
 
+  final List<String> rejected;
+
   /// Changes the server rejected because its version was newer (FR12,
   /// FR13): {"id", "label", "server_updated_at"}.
   final List<Map<String, dynamic>> conflicts;
@@ -36,9 +39,13 @@ class SyncResult {
   bool get succeeded => error == null;
 
   String get summary {
-    final waitingNote = discarded > 0
+    final discardedNote = discarded > 0
         ? ' $discarded invalid grade quer${discarded == 1 ? 'y was' : 'ies were'} removed – please flag again.'
         : '';
+    final rejectedNote = rejected.isEmpty
+        ? ''
+        : ' Not accepted by the server and removed: ${rejected.join('; ')}';
+    final waitingNote = '$discardedNote$rejectedNote';
     if (!contactedServer) return 'Nothing to send.$waitingNote';
     return 'Synced – $pushed change${pushed == 1 ? '' : 's'} sent, latest data downloaded.$waitingNote';
   }
@@ -75,6 +82,25 @@ class SyncService {
 
   void notifyLocalChange() => changes.value++;
 
+  static Map<String, dynamic> _toPushItem(PendingChange change) =>
+      change.entityType == 'grade_queries'
+      ? {
+          'table': 'grade_queries',
+          'id': change.entityId,
+          'status': 'pending',
+          'reason': change.payload['reason'],
+          'client_updated_at': change.payload['client_updated_at'],
+        }
+      : {
+          'table': 'assignments',
+          'id': change.entityId,
+          'status': change.payload['status'],
+          'client_updated_at': change.payload['client_updated_at'],
+        };
+
+  static bool _isRejection(ApiException e) =>
+      e.statusCode == 400 || e.statusCode == 403 || e.statusCode == 404;
+
   /// A grade query needs the server's grade_id (entity_id > 0) and a
   /// reason of at least 10 characters (schemas/grade_query.py).
   static bool _isInvalidGradeQuery(PendingChange change) =>
@@ -96,8 +122,8 @@ class SyncService {
 
     try {
       final pending = await db.getPendingChanges();
-      // The server rejects the whole push if one grade query is invalid,
-      // so drop those here instead of retrying them forever.
+      // Grade queries the server is sure to reject are dropped before
+      // sending, instead of being retried forever.
       final invalid = pending.where(_isInvalidGradeQuery).toList();
       for (final change in invalid) {
         await db.markChangeDiscarded(change.syncId);
@@ -106,61 +132,51 @@ class SyncService {
       final conflicts = <Map<String, dynamic>>[];
       // Files of accepted submissions: assignment id -> path on the phone.
       final uploads = <int, String>{};
+      final rejected = <String>[];
       var pushed = 0;
       var contacted = false;
       String? error;
 
-      if (pushable.isNotEmpty) {
+      for (var i = 0; i < pushable.length; i++) {
+        final change = pushable[i];
         try {
           final response = await ApiService.instance.pushChanges([
-            for (final change in pushable)
-              if (change.entityType == 'grade_queries')
-                {
-                  'table': 'grade_queries',
-                  'id': change.entityId,
-                  'status': 'pending',
-                  'reason': change.payload['reason'],
-                  'client_updated_at': change.payload['client_updated_at'],
-                }
-              else
-                {
-                  'table': 'assignments',
-                  'id': change.entityId,
-                  'status': change.payload['status'],
-                  'client_updated_at': change.payload['client_updated_at'],
-                },
+            _toPushItem(change),
           ]);
           contacted = true;
-          // Conflicts reported by the server, by table and id (server wins).
-          final serverConflicts = {
-            for (final c in response['conflicts'] as List? ?? const [])
-              '${(c as Map)['table']}:${c['id']}': c,
-          };
-          for (final change in pushable) {
-            final serverConflict =
-                serverConflicts['${change.entityType}:${change.entityId}'];
-            if (serverConflict != null) {
-              await db.markChangeConflict(change.syncId);
-              conflicts.add({
-                'id': change.entityId,
-                'label': change.label,
-                'server_updated_at': serverConflict['server_updated_at'],
-              });
-            } else {
-              await db.markChangeSynced(change.syncId);
-              if (change.entityType == 'assignments') {
-                await db.setAssignmentStatus(change.entityId, 'submitted');
-                final filePath = change.payload['file_path'] as String?;
-                if (filePath != null) uploads[change.entityId] = filePath;
-              }
-              pushed++;
+          final serverConflicts = response['conflicts'] as List? ?? const [];
+          if (serverConflicts.isNotEmpty) {
+            // The server's newer version won (FR12, FR13).
+            await db.markChangeConflict(change.syncId);
+            conflicts.add({
+              'id': change.entityId,
+              'label': change.label,
+              'server_updated_at':
+                  (serverConflicts.first as Map)['server_updated_at'],
+            });
+          } else {
+            await db.markChangeSynced(change.syncId);
+            if (change.entityType == 'assignments') {
+              await db.setAssignmentStatus(change.entityId, 'submitted');
+              final filePath = change.payload['file_path'] as String?;
+              if (filePath != null) uploads[change.entityId] = filePath;
             }
+            pushed++;
           }
         } on ApiException catch (e) {
-          for (final change in pushable) {
-            await db.recordFailedAttempt(change.syncId);
+          if (_isRejection(e)) {
+            contacted = true;
+            await db.markChangeDiscarded(change.syncId);
+            rejected.add('${change.label}: ${e.message}');
+            continue;
+          }
+          // No connection or a server error: keep this and the rest queued
+          // and retry on the next sync (D3 Reliability).
+          for (final waiting in pushable.skip(i)) {
+            await db.recordFailedAttempt(waiting.syncId);
           }
           error = 'Queued changes not sent: ${e.message}';
+          break;
         }
       }
 
@@ -202,6 +218,7 @@ class SyncService {
       return SyncResult(
         pushed: pushed,
         discarded: invalid.length,
+        rejected: rejected,
         conflicts: conflicts,
         contactedServer: contacted,
         error: error,

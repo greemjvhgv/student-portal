@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import 'api_service.dart';
+import 'local_db_service.dart';
 
 /// Thrown by [AuthService.login]; [message] is safe to show to the student.
 class AuthException implements Exception {
@@ -65,6 +66,8 @@ class AuthService {
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
+    // Clear another student's cached data before saving this login.
+    await LocalDbService.instance.useForStudent(data['student_id'] as int);
     await _storage.write(key: _tokenKey, value: data['token'] as String);
     await _storage.write(
       key: _studentIdKey,
