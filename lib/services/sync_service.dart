@@ -55,6 +55,12 @@ class SyncService {
   /// Bumped after every sync or local change, so screens reload their data.
   final ValueNotifier<int> changes = ValueNotifier<int>(0);
 
+  /// The conflicts of the latest sync that had any, manual or automatic.
+  /// main.dart listens to it and shows the "Conflict Resolved" pop-up
+  /// (Fig 8) on whatever screen is open.
+  final ValueNotifier<List<Map<String, dynamic>>> conflictsFound =
+      ValueNotifier<List<Map<String, dynamic>>>(const []);
+
   bool _isSyncing = false;
   bool _started = false;
 
@@ -192,6 +198,7 @@ class SyncService {
           DateTime.now().toUtc().toIso8601String(),
         );
       }
+      if (conflicts.isNotEmpty) conflictsFound.value = conflicts;
       return SyncResult(
         pushed: pushed,
         discarded: invalid.length,
