@@ -513,6 +513,25 @@ class LocalDbService {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  Future<void> useForStudent(int studentId) async {
+    final db = await database;
+    if (await getMeta('student_id') != '$studentId') {
+      await db.transaction((txn) async {
+        for (final table in [
+          'grades',
+          'assignments',
+          'timetable',
+          'grade_queries',
+          'pending_sync',
+          'app_meta',
+        ]) {
+          await txn.delete(table);
+        }
+      });
+    }
+    await setMeta('student_id', '$studentId');
+  }
+
   /// When the app last synced successfully with the server, or null.
   Future<DateTime?> getLastSyncedAt() async {
     final value = await getMeta('last_synced_at');
