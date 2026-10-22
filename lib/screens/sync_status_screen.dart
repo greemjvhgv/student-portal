@@ -6,7 +6,6 @@ import '../services/local_db_service.dart';
 import '../services/sync_service.dart';
 import '../utils/time_format.dart';
 import '../widgets/portal_app_bar.dart';
-import 'conflict_resolution_screen.dart';
 
 /// Sync Status (D3 Figure 6, US11): live connection card, the real offline
 /// queue from the local database ("Pending items"), recently synced items,
@@ -55,23 +54,15 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
     if (mounted) setState(_loadQueue);
   }
 
-  /// Manual sync (US11): explains when offline, shows conflicts (Fig 8)
-  /// and a short summary otherwise.
+  /// Manual sync (US11): explains when offline and shows a short summary.
+  /// Conflicts get the "Conflict Resolved" pop-up (Fig 8) from main.dart,
+  /// for manual and automatic syncs alike.
   Future<void> _syncNow() async {
     setState(() => _isSyncing = true);
     final result = await SyncService.instance.syncNow();
     if (!mounted) return;
     setState(() => _isSyncing = false);
-    if (result.conflicts.isNotEmpty) {
-      final conflict = result.conflicts.first;
-      final serverTime = DateTime.tryParse('${conflict['server_updated_at']}');
-      await showConflictResolvedDialog(
-        context,
-        recordName: conflict['label'] as String,
-        serverUpdateTime: serverTime == null ? null : clockTime(serverTime),
-      );
-      return;
-    }
+    if (result.conflicts.isNotEmpty) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(result.error ?? result.summary)));
   }
