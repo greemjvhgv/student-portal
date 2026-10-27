@@ -6,7 +6,7 @@ Run from the backend directory:
 
 It is safe to run repeatedly: The existing demo records are reused.
 """
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 import bcrypt
 from sqlalchemy import select
@@ -30,6 +30,17 @@ from app.models import (
 
 
 TEST_PASSWORD ="Test@123"
+
+# South African Standard Time: UTC+2 all year (no daylight saving).
+SAST = timezone(timedelta(hours=2))
+
+
+def due_at(day: date) -> datetime:
+    """A deadline of 23:59 South African time on `day`, stored the way the
+    server stores every time: in UTC without tzinfo (21:59). Saving 23:59
+    directly made the app show deadlines at 01:59 the next day."""
+    local = datetime.combine(day, time(23, 59), tzinfo=SAST)
+    return local.astimezone(timezone.utc).replace(tzinfo=None)
 
 STUDENTS = [
     ("Annuschka", "Deysel","EDUV4772514"),
@@ -263,10 +274,7 @@ def seed():
 
         for code, title, description, days_until_due in assignment_definitions:
             course = course_records[code]
-            due_date = datetime.combine(
-                today + timedelta(days=days_until_due),
-                time(23, 59),
-            )
+            due_date = due_at(today + timedelta(days=days_until_due))
 
             assignment = get_or_create(
                 db,
@@ -281,8 +289,14 @@ def seed():
                 },
             )
 
-            # Keep demo deadlines in the future on reruns.
-            if assignment.due_date is None or assignment.due_date < datetime.now():
+            # Keep demo deadlines in the future on reruns, and correct
+            # deadlines saved by older seeds as 23:59 UTC (shown as 01:59).
+            now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+            if (
+                assignment.due_date is None
+                or assignment.due_date < now_utc
+                or assignment.due_date.time() == time(23, 59)
+            ):
                 assignment.due_date = due_date
 
             assignment_records[(code, title)] = assignment
