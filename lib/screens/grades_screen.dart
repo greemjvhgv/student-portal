@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../models/grade.dart';
 import '../models/grade_query.dart';
 import '../models/pending_change.dart';
@@ -10,7 +9,7 @@ import '../services/sync_service.dart';
 import '../utils/time_format.dart';
 import '../widgets/portal_app_bar.dart';
 
-/// Owner: Annuschka. Matches the D3 "My Grades" wireframe (Fig 5).
+/// Owner: Annuschka.
 ///
 /// Shows the grades cached on the phone (US03, works offline) and the
 /// grade-queries module (create / read / update / delete):
@@ -25,7 +24,6 @@ class GradesScreen extends StatefulWidget {
   State<GradesScreen> createState() => _GradesScreenState();
 }
 
-/// Everything the screen shows, read from the local database in one go.
 class _GradesData {
   const _GradesData(this.grades, this.queries, this.queued, this.lastSynced);
 
@@ -43,8 +41,6 @@ class _GradesScreenState extends State<GradesScreen> {
   static const _flagRed = Color(0xFFD32F2F);
   static const _syncedGreen = Color(0xFF4CD964);
   static const _queueText = Color(0xFF1E88E5);
-
-  /// The backend rejects shorter reasons (schemas/grade_query.py).
   static const _minReasonLength = 10;
 
   late Future<_GradesData> _dataFuture = _load();
@@ -91,10 +87,8 @@ class _GradesScreenState extends State<GradesScreen> {
     return null;
   }
 
-  /// Create: pick one of your marked grades and give a reason.
   Future<void> _showGradeQueryDialog() async {
     final data = await _dataFuture;
-    // Only marked grades the server has sent (they carry its grade_id).
     final grades = data.lastSynced == null
         ? const <Grade>[]
         : data.grades.where((g) => g.mark != null && g.id != null).toList();
@@ -178,7 +172,6 @@ class _GradesScreenState extends State<GradesScreen> {
     }
   }
 
-  /// Update: change the reason of a pending query (online only).
   Future<void> _editQuery(GradeQuery query) async {
     final formKey = GlobalKey<FormState>();
     var reason = query.reason;
@@ -222,7 +215,6 @@ class _GradesScreenState extends State<GradesScreen> {
     }
   }
 
-  /// Delete: withdraw a pending query (online only).
   Future<void> _withdrawQuery(GradeQuery query) async {
     final confirmed = await showDialog<bool>(
       context: context,

@@ -1,14 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-
 import 'api_service.dart';
 import 'local_db_service.dart';
 
-/// Thrown by [AuthService.login]; [message] is safe to show to the student.
 class AuthException implements Exception {
   final String message;
   const AuthException(this.message);
@@ -28,11 +25,7 @@ class AuthService {
   static const _tokenKey = 'auth_token';
   static const _studentIdKey = 'student_id';
   static const _fullNameKey = 'full_name';
-
   static const _storage = FlutterSecureStorage();
-
-  /// Logs in and persists the session. Throws [AuthException] with a
-  /// student-friendly message on failure.
   static Future<void> login(String studentNumber, String password) async {
     final http.Response response;
     try {
@@ -66,7 +59,6 @@ class AuthService {
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    // Clear another student's cached data before saving this login.
     await LocalDbService.instance.useForStudent(data['student_id'] as int);
     await _storage.write(key: _tokenKey, value: data['token'] as String);
     await _storage.write(
@@ -87,9 +79,6 @@ class AuthService {
   }
 
   static Future<String?> getFullName() => _storage.read(key: _fullNameKey);
-
-  /// Header for authenticated requests, e.g. in SyncService:
-  /// `headers: await AuthService.authHeaders()`.
   static Future<Map<String, String>> authHeaders() async {
     final token = await getToken();
     return {
@@ -99,8 +88,5 @@ class AuthService {
   }
 
   static Future<void> logout() => _storage.deleteAll();
-
-  /// Call when any API response is 401 (token expired/invalid): clears the
-  /// session so the caller can send the student back to /login.
   static Future<void> handleUnauthorized() => logout();
 }

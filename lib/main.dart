@@ -25,8 +25,6 @@ Future<void> main() async {
   await ConnectivityService.instance.start();
   SyncService.instance.start();
   SyncService.instance.conflictsFound.addListener(_showConflictPopup);
-  // A stored token means the student already logged in once, so open
-  // straight to the dashboard (works offline too).
   final loggedIn = await AuthService.isLoggedIn();
   runApp(StudentPortalApp(initialRoute: loggedIn ? '/dashboard' : '/login'));
 }

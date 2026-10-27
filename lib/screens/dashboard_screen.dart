@@ -412,7 +412,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
-  // Header with logo, "Dashboard" title, live Online/Offline pill and logout.
   Widget _buildHeaderTitle(BuildContext context) {
     return Row(
       children: [

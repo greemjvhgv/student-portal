@@ -1,8 +1,6 @@
 import 'dart:convert';
-
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-
 import '../models/announcement.dart';
 import '../models/assignment.dart';
 import '../models/course_material.dart';
@@ -12,28 +10,13 @@ import '../models/pending_change.dart';
 import '../models/timetable_entry.dart';
 
 /// Owner: Annuschka (local database + sync client).
-///
-/// The SQLite database on the phone (sqflite). Screens read cached data
-/// from here, so they keep working offline (FR2, FR4). Table and column
-/// names mirror docs/API_CONTRACT.md. `pending_sync` mirrors the backend's
-/// SyncOperation model and holds changes made offline until SyncService
-/// pushes them (FR5, FR6). `app_meta` stores small values such as the time
-/// of the last successful sync.
 class LocalDbService {
   LocalDbService._internal();
   static final LocalDbService instance = LocalDbService._internal();
-
   static const _dbName = 'student_portal.db';
-
-  /// Version history (each step is applied in [_onUpgrade], so data that is
-  /// already on a phone is kept):
-  ///   2: app_meta, pending_sync.synced_at and more sample assignments
-  ///   3: assignments.submission_id, timetable.venue and grade_queries
   static const _dbVersion = 3;
-
   Database? _db;
 
-  /// Opens the database the first time it is needed, then reuses it.
   Future<Database> get database async {
     return _db ??= await openDatabase(
       join(await getDatabasesPath(), _dbName),
@@ -43,7 +26,6 @@ class LocalDbService {
     );
   }
 
-  /// Runs once, when the database file is first created on the phone.
   Future<void> _onCreate(Database db, int version) async {
     for (final statement in _createTables) {
       await db.execute(statement);
@@ -51,7 +33,6 @@ class LocalDbService {
     await _insertPlaceholderData(db);
   }
 
-  /// Updates databases created by an older version of the app.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute(_createAppMeta);
@@ -124,8 +105,6 @@ class LocalDbService {
     _createGradeQueries,
   ];
 
-  /// TEMPORARY sample data from the D3 wireframes, shown before the first
-  /// login. Replaced by the student's real data on the first sync.
   Future<void> _insertPlaceholderData(Database db) async {
     final now = DateTime.now().toUtc();
     final batch = db.batch();
@@ -233,8 +212,6 @@ class LocalDbService {
     await _insertSampleAssignments(db);
   }
 
-  /// TEMPORARY sample assignments, due 1–3 weeks from today at 23:59.
-  /// Existing ids are skipped, so this is safe to run during an upgrade.
   Future<void> _insertSampleAssignments(Database db) async {
     final now = DateTime.now();
     String dueIn(int days) => DateTime(
@@ -276,9 +253,6 @@ class LocalDbService {
     }
   }
 
-  // ---------------------------------------------------------------- Reading
-
-  /// All grades stored on the phone: graded modules first, then "Pending".
   Future<List<Grade>> getGrades() async {
     final db = await database;
     final rows = await db.query(
@@ -288,35 +262,30 @@ class LocalDbService {
     return rows.map((row) => Grade.fromJson(row)).toList();
   }
 
-  /// Course materials stored on the phone, grouped by module (US04).
   Future<List<CourseMaterial>> getCourseMaterials() async {
     final db = await database;
     final rows = await db.query('course_materials', orderBy: 'module_code, id');
     return rows.map((row) => CourseMaterial.fromJson(row)).toList();
   }
 
-  /// The student's weekly timetable (US01).
   Future<List<TimetableEntry>> getTimetable() async {
     final db = await database;
     final rows = await db.query('timetable', orderBy: 'id');
     return rows.map((row) => TimetableEntry.fromJson(row)).toList();
   }
 
-  /// Announcements, newest first (US02).
   Future<List<Announcement>> getAnnouncements() async {
     final db = await database;
     final rows = await db.query('announcements', orderBy: 'posted_at DESC');
     return rows.map((row) => Announcement.fromJson(row)).toList();
   }
 
-  /// The student's assignments and their status (US05).
   Future<List<Assignment>> getAssignments() async {
     final db = await database;
     final rows = await db.query('assignments', orderBy: 'due_date');
     return rows.map((row) => Assignment.fromJson(row)).toList();
   }
 
-  /// One assignment (with its current status and submission id), or null.
   Future<Assignment?> getAssignment(int assignmentId) async {
     final db = await database;
     final rows = await db.query(
@@ -328,20 +297,12 @@ class LocalDbService {
     return rows.isEmpty ? null : Assignment.fromJson(rows.first);
   }
 
-  /// Grade queries the server already has, newest first.
   Future<List<GradeQuery>> getGradeQueries() async {
     final db = await database;
     final rows = await db.query('grade_queries', orderBy: 'query_id DESC');
     return rows.map((row) => GradeQuery.fromJson(row)).toList();
   }
 
-  // ---------------------------------------------------------- Offline queue
-
-  /// Saves an assignment submission made on the phone (US05, FR5, FR6).
-  /// The assignment becomes "queued" and the change waits in pending_sync.
-  /// Both happen in one transaction, so a change is never saved without
-  /// its queue entry (D3 Reliability: no offline transaction is lost).
-  /// [filePath] is uploaded by SyncService once the submission has synced.
   Future<void> queueAssignmentSubmission(
     Assignment assignment, {
     required String fileName,
@@ -375,8 +336,6 @@ class LocalDbService {
     });
   }
 
-  /// Saves a grade query flagged on the phone (wireframe Fig 5, FR5).
-  /// [Grade.id] is the server's grade_id once the data has been synced.
   Future<void> queueGradeQuery(Grade grade, String reason) async {
     final db = await database;
     final now = DateTime.now().toUtc().toIso8601String();
@@ -393,7 +352,6 @@ class LocalDbService {
     });
   }
 
-  /// Changes still waiting to reach the server, oldest first.
   Future<List<PendingChange>> getPendingChanges() async {
     final db = await database;
     final rows = await db.query(
@@ -403,8 +361,6 @@ class LocalDbService {
     );
     return rows.map(PendingChange.fromRow).toList();
   }
-
-  /// The most recently finished changes (synced or resolved as conflict).
   Future<List<PendingChange>> getRecentlySynced({int limit = 5}) async {
     final db = await database;
     final rows = await db.query(
@@ -421,7 +377,6 @@ class LocalDbService {
   Future<void> markChangeConflict(int syncId) =>
       _finishChange(syncId, 'conflict');
 
-  /// Removes an invalid change from the queue without sending it.
   Future<void> markChangeDiscarded(int syncId) =>
       _finishChange(syncId, 'discarded');
 
@@ -435,8 +390,6 @@ class LocalDbService {
     );
   }
 
-  /// Counts a failed push; the change stays queued and is retried (D3
-  /// Reliability: automatic retry after a communication failure).
   Future<void> recordFailedAttempt(int syncId) async {
     final db = await database;
     await db.rawUpdate(
@@ -455,10 +408,6 @@ class LocalDbService {
     );
   }
 
-  /// Replaces the cached tables with the server's data from
-  /// GET /sync/pull (FR10). Assignments still queued on the phone keep
-  /// their "queued" status, so pulling never hides an unsent submission.
-  /// Known module names are kept if the server sends none.
   Future<void> saveServerSnapshot(Map<String, dynamic> data) async {
     final db = await database;
     final queuedIds = {
@@ -497,8 +446,6 @@ class LocalDbService {
     });
   }
 
-  // ------------------------------------------------------------- App values
-
   Future<String?> getMeta(String key) async {
     final db = await database;
     final rows = await db.query('app_meta', where: 'key = ?', whereArgs: [key]);
@@ -531,8 +478,6 @@ class LocalDbService {
     }
     await setMeta('student_id', '$studentId');
   }
-
-  /// When the app last synced successfully with the server, or null.
   Future<DateTime?> getLastSyncedAt() async {
     final value = await getMeta('last_synced_at');
     return value == null ? null : DateTime.parse(value);

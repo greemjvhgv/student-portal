@@ -63,7 +63,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Download the student's data in the background (FR3).
     SyncService.instance.syncNow();
 
     if (!mounted) return;
