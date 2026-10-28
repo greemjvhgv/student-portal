@@ -7,6 +7,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/grades_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/sync_status_screen.dart';
+import 'screens/timetable_screen.dart';
 import 'services/auth_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/sync_service.dart';
@@ -66,6 +67,7 @@ class StudentPortalApp extends StatelessWidget {
         '/assignments': (context) => const AssignmentsScreen(),
         '/course-materials': (context) => const CourseMaterialsScreen(),
         '/sync-status': (context) => const SyncStatusScreen(),
+        '/timetable': (context) => const TimetableScreen(),
       },
     );
   }

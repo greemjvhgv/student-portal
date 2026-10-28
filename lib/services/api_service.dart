@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
@@ -21,6 +22,23 @@ class ApiService {
 
   static const Duration _timeout = Duration(seconds: 10);
   final http.Client _client = http.Client();
+
+  /// False after a request could not reach the backend, even though the
+  /// phone has Wi-Fi or mobile data. The Sync Status screen shows it.
+  final ValueNotifier<bool> serverReachable = ValueNotifier<bool>(true);
+
+  /// Pings the backend's root endpoint and updates [serverReachable].
+  Future<bool> checkServer() async {
+    try {
+      await _client
+          .get(Uri.parse('$baseUrl/'))
+          .timeout(const Duration(seconds: 3));
+      serverReachable.value = true;
+    } on Exception {
+      serverReachable.value = false;
+    }
+    return serverReachable.value;
+  }
 
   Future<Map<String, dynamic>> pushChanges(
     List<Map<String, dynamic>> changes,
@@ -98,6 +116,7 @@ class ApiService {
   Future<dynamic> _send(Future<http.Response> Function() request) async {
     try {
       final response = await request().timeout(_timeout);
+      serverReachable.value = true;
       final body = response.body.isEmpty ? null : jsonDecode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) return body;
       if (response.statusCode == 401) {
@@ -114,6 +133,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } on Exception {
+      serverReachable.value = false;
       throw ApiException('Could not reach the server.');
     }
   }

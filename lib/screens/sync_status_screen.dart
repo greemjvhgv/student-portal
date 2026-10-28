@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/pending_change.dart';
+import '../services/api_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/local_db_service.dart';
 import '../services/sync_service.dart';
@@ -36,6 +37,9 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
     super.initState();
     _loadQueue();
     SyncService.instance.changes.addListener(_onSyncChanged);
+    if (ConnectivityService.instance.isOnline.value) {
+      ApiService.instance.checkServer();
+    }
   }
 
   @override
@@ -67,11 +71,37 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
         .showSnackBar(SnackBar(content: Text(result.error ?? result.summary)));
   }
 
-  Widget _statusCard(bool isOnline) {
-    final fill = isOnline ? const Color(0xFFEFFAF1) : const Color(0xFFFFF1F1);
-    final border = isOnline ? const Color(0xFF81C784) : const Color(0xFFFF8A8A);
-    final dot = isOnline ? const Color(0xFF4CD964) : const Color(0xFFD32F2F);
-    final text = isOnline ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C);
+  /// Online with the server answering, online without the server (BUG-11),
+  /// or offline.
+  Widget _statusCard(bool isOnline, bool serverReachable) {
+    if (isOnline && !serverReachable) {
+      return _statusBox(
+        title: 'Server unreachable',
+        subtitle: 'Changes stay queued. Tap Sync Now to try again.',
+        fill: const Color(0xFFFFF8E1),
+        border: const Color(0xFFFFB74D),
+        dot: const Color(0xFFF57C00),
+        text: const Color(0xFF8D4A00),
+      );
+    }
+    return _statusBox(
+      title: isOnline ? 'Online' : 'Offline',
+      subtitle: isOnline ? 'Ready to sync' : 'Sync will resume automatically',
+      fill: isOnline ? const Color(0xFFEFFAF1) : const Color(0xFFFFF1F1),
+      border: isOnline ? const Color(0xFF81C784) : const Color(0xFFFF8A8A),
+      dot: isOnline ? const Color(0xFF4CD964) : const Color(0xFFD32F2F),
+      text: isOnline ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C),
+    );
+  }
+
+  Widget _statusBox({
+    required String title,
+    required String subtitle,
+    required Color fill,
+    required Color border,
+    required Color dot,
+    required Color text,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -88,7 +118,7 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isOnline ? 'Online' : 'Offline',
+                  title,
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -96,7 +126,7 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
                   ),
                 ),
                 Text(
-                  isOnline ? 'Ready to sync' : 'Sync will resume automatically',
+                  subtitle,
                   style: TextStyle(fontSize: 16, color: text),
                 ),
               ],
@@ -169,7 +199,11 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
           children: [
             ValueListenableBuilder<bool>(
               valueListenable: ConnectivityService.instance.isOnline,
-              builder: (context, isOnline, _) => _statusCard(isOnline),
+              builder: (context, isOnline, _) => ValueListenableBuilder<bool>(
+                valueListenable: ApiService.instance.serverReachable,
+                builder: (context, serverReachable, _) =>
+                    _statusCard(isOnline, serverReachable),
+              ),
             ),
             FutureBuilder<List<PendingChange>>(
               future: _pendingFuture,

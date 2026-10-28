@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/assignment.dart';
 import '../services/local_db_service.dart';
+import '../services/sync_service.dart';
 import '../utils/time_format.dart';
 import '../widgets/portal_app_bar.dart';
 import 'submit_assignment_screen.dart';
@@ -26,6 +27,25 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   Future<List<Assignment>> _assignmentsFuture = LocalDbService.instance
       .getAssignments();
 
+  @override
+  void initState() {
+    super.initState();
+    SyncService.instance.changes.addListener(_reload);
+  }
+
+  @override
+  void dispose() {
+    SyncService.instance.changes.removeListener(_reload);
+    super.dispose();
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    setState(() {
+      _assignmentsFuture = LocalDbService.instance.getAssignments();
+    });
+  }
+
   Future<void> _open(Assignment assignment) async {
     await Navigator.push(
       context,
@@ -33,10 +53,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         builder: (context) => SubmitAssignmentScreen(assignment: assignment),
       ),
     );
-    if (!mounted) return;
-    setState(() {
-      _assignmentsFuture = LocalDbService.instance.getAssignments();
-    });
+    _reload();
   }
 
   Widget _statusChip(String status) {

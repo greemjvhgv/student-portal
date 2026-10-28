@@ -30,7 +30,7 @@ class LocalDbService {
     for (final statement in _createTables) {
       await db.execute(statement);
     }
-    await _insertPlaceholderData(db);
+    await _insertCourseMaterials(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -105,79 +105,12 @@ class LocalDbService {
     _createGradeQueries,
   ];
 
-  Future<void> _insertPlaceholderData(Database db) async {
-    final now = DateTime.now().toUtc();
+  /// Grades, timetable, announcements and assignments come only from the
+  /// server's sync, so a new install shows nothing until the first sync
+  /// (BUG-13). Course materials stay a local list in this prototype: the
+  /// pull doesn't include them and file downloads aren't built yet.
+  Future<void> _insertCourseMaterials(Database db) async {
     final batch = db.batch();
-
-    for (final grade in [
-      {
-        'module_code': 'ITMDA3-34',
-        'module_name': 'Project - Mobile & Web Services',
-        'mark': 84.0,
-      },
-      {
-        'module_code': 'ITMTA3-33',
-        'module_name': 'Calculus Mathematics',
-        'mark': 72.0,
-      },
-      {
-        'module_code': 'ITOPE3-33',
-        'module_name': 'Operating Systems',
-        'mark': null,
-      },
-    ]) {
-      batch.insert('grades', {...grade, 'updated_at': now.toIso8601String()});
-    }
-
-    for (final entry in [
-      {
-        'module_code': 'ITMDA3-34',
-        'day': 'Monday',
-        'time': '15:00',
-        'type': 'Consultation',
-      },
-      {
-        'module_code': 'ITMDA3-34',
-        'day': 'Monday',
-        'time': '18:00',
-        'type': 'Lecture',
-      },
-      {
-        'module_code': 'ITMTA3-33',
-        'day': 'Tuesday',
-        'time': '11:30',
-        'type': 'Practical',
-      },
-      {
-        'module_code': 'ITOPE3-33',
-        'day': 'Thursday',
-        'time': '10:00',
-        'type': 'Tutorial',
-      },
-    ]) {
-      batch.insert('timetable', entry);
-    }
-
-    for (final announcement in [
-      {
-        'title': 'Deliverable 3 due 4 Sept',
-        'body': 'Please upload all Deliverable 3 work before 4 Sept.',
-        'posted_at': '2026-09-01',
-      },
-      {
-        'title': 'Portal maintenance',
-        'body': 'Saturday 10pm',
-        'posted_at': '2026-09-28',
-      },
-      {
-        'title': 'New study guide uploaded',
-        'body': 'The updated ITMDA3-34 study guide is available.',
-        'posted_at': '2026-10-01',
-      },
-    ]) {
-      batch.insert('announcements', announcement);
-    }
-
     for (final material in [
       {
         'module_code': 'ITMDA3-34',
@@ -207,9 +140,7 @@ class LocalDbService {
     ]) {
       batch.insert('course_materials', material);
     }
-
     await batch.commit(noResult: true);
-    await _insertSampleAssignments(db);
   }
 
   Future<void> _insertSampleAssignments(Database db) async {
@@ -468,6 +399,7 @@ class LocalDbService {
           'grades',
           'assignments',
           'timetable',
+          'announcements',
           'grade_queries',
           'pending_sync',
           'app_meta',

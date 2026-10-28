@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/announcement.dart';
 import '../services/local_db_service.dart';
+import '../services/sync_service.dart';
 import 'announcement_detail_screen.dart';
 
 /// Built by Charleen; connected to the local database by Annuschka.
@@ -13,9 +14,27 @@ class AnnouncementsScreen extends StatefulWidget {
 }
 
 class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
-  final Future<List<Announcement>> _announcementsFuture = LocalDbService
-      .instance
+  Future<List<Announcement>> _announcementsFuture = LocalDbService.instance
       .getAnnouncements();
+
+  @override
+  void initState() {
+    super.initState();
+    SyncService.instance.changes.addListener(_reload);
+  }
+
+  @override
+  void dispose() {
+    SyncService.instance.changes.removeListener(_reload);
+    super.dispose();
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    setState(
+      () => _announcementsFuture = LocalDbService.instance.getAnnouncements(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

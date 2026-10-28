@@ -71,13 +71,15 @@ class SyncService {
   bool _isSyncing = false;
   bool _started = false;
 
-  /// Starts auto-sync on reconnect. Called once, from main.dart.
+  /// Starts auto-sync on reconnect, and sends anything left in the queue
+  /// when the app opens already online. Called once, from main.dart.
   void start() {
     if (_started) return;
     _started = true;
     ConnectivityService.instance.isOnline.addListener(() {
       if (ConnectivityService.instance.isOnline.value) syncNow();
     });
+    if (ConnectivityService.instance.isOnline.value) syncNow();
   }
 
   void notifyLocalChange() => changes.value++;
