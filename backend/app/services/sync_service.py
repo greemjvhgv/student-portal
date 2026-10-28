@@ -185,6 +185,9 @@ def _apply_grade_query(db, student_id: int, grade_id: int, fields: dict, client_
     if len(reason) < 10:
         raise ValueError("A grade query reason needs at least 10 characters.")
 
+    if len(reason) > 1000:
+        raise ValueError("A grade query reason can be at most 1000 characters.")
+
     grade = (
         db.query(Grade)
         .filter(Grade.grade_id == grade_id, Grade.student_id == student_id)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/course_material.dart';
 import '../services/local_db_service.dart';
+import '../services/sync_service.dart';
 import '../widgets/dashed_border_painter.dart';
 import '../widgets/portal_app_bar.dart';
 
@@ -27,8 +28,27 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
   static const _warningBorder = Color(0xFFFFD54F);
   static const _warningText = Color(0xFF8D4A00);
 
-  final Future<List<CourseMaterial>> _materialsFuture = LocalDbService.instance
+  Future<List<CourseMaterial>> _materialsFuture = LocalDbService.instance
       .getCourseMaterials();
+
+  @override
+  void initState() {
+    super.initState();
+    SyncService.instance.changes.addListener(_reload);
+  }
+
+  @override
+  void dispose() {
+    SyncService.instance.changes.removeListener(_reload);
+    super.dispose();
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    setState(
+      () => _materialsFuture = LocalDbService.instance.getCourseMaterials(),
+    );
+  }
 
   void _openMaterial(CourseMaterial material) {
     final message = material.isCached

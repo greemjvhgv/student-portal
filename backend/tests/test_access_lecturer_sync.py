@@ -268,6 +268,14 @@ def test_push_grade_query_for_someone_elses_grade_is_rejected(client):
     assert r.status_code == 400
 
 
+def test_push_grade_query_over_1000_characters_is_rejected(client):
+    ann = student_headers(client)
+    r = push_grade_query(client, ann, 1, datetime.now(timezone.utc),
+                         reason="A" * 1001)
+    assert r.status_code == 400
+    assert client.get("/grade-queries", headers=ann).json() == []
+
+
 def test_newer_lecturer_grade_update_wins_over_offline_query(client):
     ann = student_headers(client)
     flagged_offline_at = datetime.now(timezone.utc)

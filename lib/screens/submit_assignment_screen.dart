@@ -43,6 +43,10 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
   /// The file types the backend accepts (submission_files.py).
   static const _allowedExtensions = ['pdf', 'docx', 'txt'];
 
+  /// The backend's upload limit (MAX_FILE_SIZE in submission_files.py).
+  static const _maxFileBytes = 10 * 1024 * 1024;
+  static const _tooLargeMessage = 'This file is larger than the 10 MB limit';
+
   final _notesController = TextEditingController();
   late Assignment _assignment = widget.assignment;
   PlatformFile? _attachedFile;
@@ -94,7 +98,16 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
 
   Future<void> _pickFile() async {
     final file = await _chooseFile();
-    if (file == null || !mounted) return;
+    if (file == null) return;
+    final size = await file.length();
+    if (!mounted) return;
+    if (size != null && size > _maxFileBytes) {
+      setState(() {
+        _attachedFile = null;
+        _attachmentError = '$_tooLargeMessage. Choose a smaller file.';
+      });
+      return;
+    }
     setState(() {
       _attachedFile = file;
       _attachmentError = null;
@@ -127,8 +140,8 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
     var message = 'Saved – it will sync automatically when you are back online';
     if (ConnectivityService.instance.isOnline.value) {
       final result = await SyncService.instance.syncNow();
-      message = result.succeeded && result.pushed > 0
-          ? 'Assignment submitted'
+      message = result.pushed > 0
+          ? result.error ?? 'Assignment submitted'
           : 'Saved on this device – it will be sent automatically (${result.error ?? result.summary})';
     }
     if (!mounted) return;
@@ -146,9 +159,14 @@ class _SubmitAssignmentScreenState extends State<SubmitAssignmentScreen> {
     final submissionId = _assignment.submissionId;
     final file = await _chooseFile();
     if (submissionId == null || file?.path == null) return;
+    final size = await file!.length();
+    if (size != null && size > _maxFileBytes) {
+      _showMessage('File not replaced: ${_tooLargeMessage.toLowerCase()}');
+      return;
+    }
     setState(() => _isSaving = true);
     try {
-      await ApiService.instance.uploadSubmissionFile(submissionId, file!.path!);
+      await ApiService.instance.uploadSubmissionFile(submissionId, file.path!);
       await SyncService.instance.syncNow();
       _showMessage('File replaced with ${file.name}');
     } on Exception catch (e) {

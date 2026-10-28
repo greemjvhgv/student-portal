@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-
 import '../models/announcement.dart';
 
-/// Displays the full content of a selected announcement.
 class AnnouncementDetailScreen extends StatelessWidget {
   final Announcement announcement;
 
@@ -10,7 +8,6 @@ class AnnouncementDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Format date string as YYYY-MM-DD
     final formattedDate = announcement.postedAt.toIso8601String().split('T')[0];
 
     return Scaffold(

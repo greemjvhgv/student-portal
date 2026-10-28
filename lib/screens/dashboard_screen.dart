@@ -8,6 +8,7 @@ import 'announcement_detail_screen.dart';
 import 'timetable_screen.dart';
 import '../services/connectivity_service.dart';
 import '../services/auth_service.dart';
+import '../services/sync_service.dart';
 
 /// Owner: Charleen. The home screen (D3 Dashboard wireframe): today's
 /// timetable and the latest announcements from the local database, the
@@ -30,14 +31,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'Sunday',
   ];
 
-  final Future<List<TimetableEntry>> _todayFuture = LocalDbService.instance
-      .getTimetable()
-      .then((entries) {
+  late Future<List<TimetableEntry>> _todayFuture = _loadToday();
+  late Future<List<Announcement>> _announcementsFuture = _loadAnnouncements();
+
+  @override
+  void initState() {
+    super.initState();
+    SyncService.instance.changes.addListener(_reload);
+  }
+
+  @override
+  void dispose() {
+    SyncService.instance.changes.removeListener(_reload);
+    super.dispose();
+  }
+
+  /// Reloads after every sync, so data downloaded after login shows up.
+  void _reload() {
+    if (!mounted) return;
+    setState(() {
+      _todayFuture = _loadToday();
+      _announcementsFuture = _loadAnnouncements();
+    });
+  }
+
+  static Future<List<TimetableEntry>> _loadToday() =>
+      LocalDbService.instance.getTimetable().then((entries) {
         final today = _weekdays[DateTime.now().weekday - 1];
         return entries.where((entry) => entry.day == today).toList();
       });
 
-  final Future<List<Announcement>> _announcementsFuture = LocalDbService
+  static Future<List<Announcement>> _loadAnnouncements() => LocalDbService
       .instance
       .getAnnouncements()
       .then((list) => list.take(3).toList());
@@ -95,6 +119,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    _buildActionButton(
+                      context,
+                      label: 'My Timetable',
+                      route: '/timetable',
+                      bgColor: buttonBgColor,
+                      borderColor: buttonBorderColor,
+                      textColor: buttonTextColor,
+                    ),
+                    const SizedBox(height: 14),
                     _buildActionButton(
                       context,
                       label: 'My Grades',
@@ -412,7 +445,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
-  // Header with logo, "Dashboard" title, live Online/Offline pill and logout.
   Widget _buildHeaderTitle(BuildContext context) {
     return Row(
       children: [

@@ -71,13 +71,15 @@ class SyncService {
   bool _isSyncing = false;
   bool _started = false;
 
-  /// Starts auto-sync on reconnect. Called once, from main.dart.
+  /// Starts auto-sync on reconnect, and sends anything left in the queue
+  /// when the app opens already online. Called once, from main.dart.
   void start() {
     if (_started) return;
     _started = true;
     ConnectivityService.instance.isOnline.addListener(() {
       if (ConnectivityService.instance.isOnline.value) syncNow();
     });
+    if (ConnectivityService.instance.isOnline.value) syncNow();
   }
 
   void notifyLocalChange() => changes.value++;
@@ -122,15 +124,12 @@ class SyncService {
 
     try {
       final pending = await db.getPendingChanges();
-      // Grade queries the server is sure to reject are dropped before
-      // sending, instead of being retried forever.
       final invalid = pending.where(_isInvalidGradeQuery).toList();
       for (final change in invalid) {
         await db.markChangeDiscarded(change.syncId);
       }
       final pushable = pending.where((c) => !invalid.contains(c)).toList();
       final conflicts = <Map<String, dynamic>>[];
-      // Files of accepted submissions: assignment id -> path on the phone.
       final uploads = <int, String>{};
       final rejected = <String>[];
       var pushed = 0;
@@ -146,7 +145,6 @@ class SyncService {
           contacted = true;
           final serverConflicts = response['conflicts'] as List? ?? const [];
           if (serverConflicts.isNotEmpty) {
-            // The server's newer version won (FR12, FR13).
             await db.markChangeConflict(change.syncId);
             conflicts.add({
               'id': change.entityId,
@@ -170,8 +168,6 @@ class SyncService {
             rejected.add('${change.label}: ${e.message}');
             continue;
           }
-          // No connection or a server error: keep this and the rest queued
-          // and retry on the next sync (D3 Reliability).
           for (final waiting in pushable.skip(i)) {
             await db.recordFailedAttempt(waiting.syncId);
           }
@@ -180,7 +176,6 @@ class SyncService {
         }
       }
 
-      // Pull after the push, so the downloaded data already includes it.
       final studentId = await AuthService.getStudentId();
       if (studentId != null) {
         try {
@@ -193,7 +188,6 @@ class SyncService {
         }
       }
 
-      // Upload the files last: the pull gave us each submission_id.
       for (final upload in uploads.entries) {
         final submissionId = (await db.getAssignment(upload.key))?.submissionId;
         if (submissionId == null) continue;

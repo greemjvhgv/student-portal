@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/timetable_entry.dart';
 import '../services/local_db_service.dart';
+import '../services/sync_service.dart';
 
 /// Owner: Charleen. The student's weekly timetable (US01), read from the
 /// phone's local database, so it also works offline. Each slot shows the
@@ -14,8 +15,25 @@ class TimetableScreen extends StatefulWidget {
 }
 
 class _TimetableScreenState extends State<TimetableScreen> {
-  final Future<List<TimetableEntry>> _entriesFuture = LocalDbService.instance
+  Future<List<TimetableEntry>> _entriesFuture = LocalDbService.instance
       .getTimetable();
+
+  @override
+  void initState() {
+    super.initState();
+    SyncService.instance.changes.addListener(_reload);
+  }
+
+  @override
+  void dispose() {
+    SyncService.instance.changes.removeListener(_reload);
+    super.dispose();
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    setState(() => _entriesFuture = LocalDbService.instance.getTimetable());
+  }
 
   @override
   Widget build(BuildContext context) {

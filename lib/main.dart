@@ -7,6 +7,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/grades_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/sync_status_screen.dart';
+import 'screens/timetable_screen.dart';
 import 'services/auth_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/sync_service.dart';
@@ -25,8 +26,6 @@ Future<void> main() async {
   await ConnectivityService.instance.start();
   SyncService.instance.start();
   SyncService.instance.conflictsFound.addListener(_showConflictPopup);
-  // A stored token means the student already logged in once, so open
-  // straight to the dashboard (works offline too).
   final loggedIn = await AuthService.isLoggedIn();
   runApp(StudentPortalApp(initialRoute: loggedIn ? '/dashboard' : '/login'));
 }
@@ -68,6 +67,7 @@ class StudentPortalApp extends StatelessWidget {
         '/assignments': (context) => const AssignmentsScreen(),
         '/course-materials': (context) => const CourseMaterialsScreen(),
         '/sync-status': (context) => const SyncStatusScreen(),
+        '/timetable': (context) => const TimetableScreen(),
       },
     );
   }
