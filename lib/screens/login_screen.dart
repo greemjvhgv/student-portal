@@ -32,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _studentNumberController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _showPassword = false;
   String? _errorText;
 
   @override
@@ -150,8 +151,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 _label('Password'),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: _fieldDecoration('••••••••••'),
-                  obscureText: true,
+                  decoration: _fieldDecoration('••••••••••').copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _showPassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      tooltip: _showPassword ? 'Hide password' : 'Show password',
+                      onPressed: () =>
+                          setState(() => _showPassword = !_showPassword),
+                    ),
+                  ),
+                  obscureText: !_showPassword,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _handleLogin(),
                   validator: (value) => (value == null || value.isEmpty)

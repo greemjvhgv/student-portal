@@ -193,16 +193,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? const Color(0xFF00E5FF) : Colors.white,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 16,
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? const Color(0xFF00E5FF) : Colors.white,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 16,
+              ),
+            ),
           ),
         ),
       ),
