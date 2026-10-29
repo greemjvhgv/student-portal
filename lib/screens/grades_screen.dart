@@ -108,6 +108,7 @@ class _GradesScreenState extends State<GradesScreen> {
     final submitted = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Flag a grade query'),
         content: Form(
           key: formKey,
@@ -183,6 +184,7 @@ class _GradesScreenState extends State<GradesScreen> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Text('Edit query – ${query.moduleCode}'),
         content: Form(
           key: formKey,
