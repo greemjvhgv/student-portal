@@ -86,10 +86,6 @@ def seed():
 
     try:
         today = date.today()
-        today_name = today.strftime("%A")
-        next_day_name = (
-            today + timedelta(days=1)
-        ).strftime("%A")
 
         # 1. Roles
         student_role = get_or_create(
@@ -177,12 +173,12 @@ def seed():
                 )
 
         # 6. Timetable
-        # Two classes per course today, one tomorrow.
-        # This guarantees a populated Today's Timetable.
+        # Fixed weekly schedule prevents additional entries
+        # from being generated when the seed runs on different days.
         timetable_slots = [
-            (today_name, time(8, 0), time(9, 0), "Room A101"),
-            (today_name, time(11, 0), time(12, 0), "Room B202"),
-            (next_day_name, time(10, 0), time(11, 0), "Lab C303"),
+            ("Monday", time(8, 0), time(9, 0), "Room A101"),
+            ("Thursday", time(11, 0), time(12, 0), "Room B202"),
+            ("Friday", time(10, 0), time(11, 0), "Lab C303"),
         ]
 
         for course in course_records.values():
@@ -387,7 +383,7 @@ def seed():
         print(f"Students: {len(student_records)}")
         print(f"Courses: {len(course_records)}")
         print("Lecturer: lecturer@test.local")
-        print(f"Today's timetable day: {today_name}")
+        print("Timetable: fixed weekly schedule")
         print(f"Demo password: {TEST_PASSWORD}")
 
     except Exception:
