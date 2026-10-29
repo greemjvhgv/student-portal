@@ -9,7 +9,7 @@ It is safe to run repeatedly: The existing demo records are reused.
 from datetime import date, datetime, time, timedelta, timezone
 
 import bcrypt
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.database import Base, SessionLocal, engine
 import app.models
@@ -179,6 +179,15 @@ def seed():
         # 6. Timetable
         # Two classes per course today, one tomorrow.
         # This guarantees a populated Today's Timetable.
+        # Old slots are removed first, so a seed run on another
+        # day replaces the timetable instead of adding to it.
+        db.execute(
+            delete(Timetable).where(
+                Timetable.course_id.in_(
+                    [c.course_id for c in course_records.values()]
+                )
+            )
+        )
         timetable_slots = [
             (today_name, time(8, 0), time(9, 0), "Room A101"),
             (today_name, time(11, 0), time(12, 0), "Room B202"),
